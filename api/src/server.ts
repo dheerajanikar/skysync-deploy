@@ -155,13 +155,13 @@ app.get("/api/user-context/:phone_number", async (req, res) => {
 // Dynamic webhook for Telnyx
 // Dynamic webhook for Telnyx
 // Dynamic webhook for Telnyx
+// Dynamic webhook for Telnyx
 app.post("/api/user-context", async (req, res) => {
+  const startTime = Date.now();
   console.log("=== TELNYX WEBHOOK CALLED ===");
   console.log("Full request body:", JSON.stringify(req.body, null, 2));
   
-  // Telnyx sends: data.payload.telnyx_end_user_target
   const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
-  
   console.log("Extracted phone:", phone_number);
 
   const supabase = createClient(
@@ -175,9 +175,10 @@ app.post("/api/user-context", async (req, res) => {
     .eq("phone_number", phone_number);
   
   const user = users?.[0];
+  console.log("Found user:", user);
 
   if (!user) {
-    return res.json({
+    const response = {
       dynamic_variables: {
         caller_name: "there",
         flight_number: "",
@@ -186,7 +187,10 @@ app.post("/api/user-context", async (req, res) => {
         departure_time: "",
         home_airport: ""
       }
-    });
+    };
+    console.log("Sending response (no user):", response);
+    console.log("Response time:", Date.now() - startTime, "ms");
+    return res.json(response);
   }
 
   const { data: flight } = await supabase
@@ -198,7 +202,9 @@ app.post("/api/user-context", async (req, res) => {
     .limit(1)
     .single();
 
-  return res.json({
+  console.log("Found flight:", flight);
+
+  const response = {
     dynamic_variables: {
       caller_name: user.name,
       flight_number: flight?.flight_number || "",
@@ -207,7 +213,11 @@ app.post("/api/user-context", async (req, res) => {
       departure_time: flight?.departure_time || "",
       home_airport: user.home_airport
     }
-  });
+  };
+  
+  console.log("Sending response:", response);
+  console.log("Response time:", Date.now() - startTime, "ms");
+  return res.json(response);
 });
 const PORT = process.env.PORT || 3002;
 
