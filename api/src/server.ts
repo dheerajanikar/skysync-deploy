@@ -9,6 +9,13 @@ import { spawn } from "child_process";
 
 const app = express();
 app.use(cors());
+
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_KEY || ''
+);
+
+
 app.use(express.json({
   verify: (req, res, buf) => {
     console.log("Raw buffer:", buf.toString());
@@ -168,10 +175,7 @@ app.post("/api/user-context", async (req, res) => {
     return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
   }
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  );
+  
 
   // Query 1: Just get user ID and name
   const { data: user } = await supabase
