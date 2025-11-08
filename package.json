@@ -1,0 +1,8 @@
+{
+    "name": "skysync-deploy",
+    "version": "1.0.0",
+    "scripts": {
+      "build": "cd mcp-server && npm install && npm run build && cd ../api && npm install && npm run build",
+      "start": "cd api && npm start"
+    }
+  }
