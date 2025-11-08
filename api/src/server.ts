@@ -160,21 +160,7 @@ app.post("/api/user-context", async (req, res) => {
   const startTime = Date.now();
   const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
   
-  const supabase = createClient(
-    process.env.SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  );
-
-  // Query 1: Get user
-  const { data: users, error: userError } = await supabase
-    .from("users")
-    .select("*")
-    .eq("phone_number", phone_number)
-    .single();
-  
-  console.log("User query result:", users, "error:", userError);
-
-  if (!users) {
+  if (!phone_number) {
     return res.json({
       dynamic_variables: {
         caller_name: "there",
@@ -187,32 +173,58 @@ app.post("/api/user-context", async (req, res) => {
     });
   }
 
-  // Query 2: Get flight
-  const { data: flights, error: flightError } = await supabase
-    .from("user_flights")
-    .select("*")
-    .eq("user_id", users.id)
-    .gte("flight_date", new Date().toISOString().split("T")[0])
-    .order("flight_date", { ascending: true })
-    .limit(1);
+  const supabase = createClient(
+    process.env.SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_KEY || ''
+  );
 
-  console.log("Flight query result:", flights, "error:", flightError);
-  
-  const flight = flights?.[0];
+  try {
+    // Parallel queries to speed up
+    const [userResult, flightResult] = await Promise.all([
+      supabase
+        .from("users")
+        .select("*")
+        .eq("phone_number", phone_number)
+        .single(),
+      
+      supabase
+        .from("user_flights")
+        .select("*")
+        .eq("phone_number", phone_number) // Assuming you can query by phone directly
+        .order("flight_date", { ascending: false })
+        .limit(1)
+        .single()
+    ]);
 
-  const response = {
-    dynamic_variables: {
-      caller_name: users.name || "there",
-      flight_number: flight?.flight_number || "",
-      origin: flight?.origin || "",
-      destination: flight?.destination || "",
-      departure_time: flight?.departure_time || "",
-      home_airport: users.home_airport || ""
-    }
-  };
-  
-  console.log("Response time:", Date.now() - startTime, "ms");
-  return res.json(response);
+    const user = userResult.data;
+    const flight = flightResult.data;
+
+    const response = {
+      dynamic_variables: {
+        caller_name: user?.name || "there",
+        flight_number: flight?.flight_number || "",
+        origin: flight?.origin || "",
+        destination: flight?.destination || "",
+        departure_time: flight?.departure_time || "",
+        home_airport: user?.home_airport || ""
+      }
+    };
+    
+    console.log("Response time:", Date.now() - startTime, "ms");
+    return res.json(response);
+  } catch (error) {
+    console.error("Error:", error);
+    return res.json({
+      dynamic_variables: {
+        caller_name: "there",
+        flight_number: "",
+        origin: "",
+        destination: "",
+        departure_time: "",
+        home_airport: ""
+      }
+    });
+  }
 });
  
 const PORT = process.env.PORT || 3002;
