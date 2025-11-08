@@ -164,18 +164,7 @@ app.post("/api/user-context", async (req, res) => {
   const startTime = Date.now();
   const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
   
-  const supabase = createClient(
-    process.env.SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  );
-
-  const { data: user } = await supabase
-    .from("users")
-    .select("id, name, home_airport") // Only select needed fields
-    .eq("phone_number", phone_number)
-    .single();
-
-  if (!user) {
+  if (!phone_number) {
     return res.json({
       dynamic_variables: {
         caller_name: "there",
@@ -188,29 +177,51 @@ app.post("/api/user-context", async (req, res) => {
     });
   }
 
-  const { data: flights } = await supabase
-    .from("user_flights")
-    .select("flight_number, origin, destination, departure_time, flight_date") // Only needed fields
-    .eq("user_id", user.id)
-    .gte("flight_date", new Date().toISOString().split("T")[0])
-    .order("flight_date", { ascending: true })
-    .limit(1);
+  const supabase = createClient(
+    process.env.SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_KEY || ''
+  );
 
-  const flight = flights?.[0];
+  // Get user with their most recent flight in ONE query using a join
+  const { data, error } = await supabase
+    .from("users")
+    .select(`
+      name,
+      home_airport,
+      user_flights!inner(flight_number, origin, destination, departure_time)
+    `)
+    .eq("phone_number", phone_number)
+    .order("user_flights(flight_date)", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const response = {
+  console.log("Query result:", data, "Time:", Date.now() - startTime, "ms");
+
+  if (!data) {
+    return res.json({
+      dynamic_variables: {
+        caller_name: "there",
+        flight_number: "",
+        origin: "",
+        destination: "",
+        departure_time: "",
+        home_airport: ""
+      }
+    });
+  }
+
+  const flight = data.user_flights?.[0];
+
+  return res.json({
     dynamic_variables: {
-      caller_name: user.name || "there",
+      caller_name: data.name || "there",
       flight_number: flight?.flight_number || "",
       origin: flight?.origin || "",
       destination: flight?.destination || "",
       departure_time: flight?.departure_time || "",
-      home_airport: user.home_airport || ""
+      home_airport: data.home_airport || ""
     }
-  };
-  
-  console.log("Response time:", Date.now() - startTime, "ms");
-  return res.json(response);
+  });
 });
  
 const PORT = process.env.PORT || 3002;
