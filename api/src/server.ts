@@ -165,35 +165,56 @@ app.post("/api/user-context", async (req, res) => {
     process.env.SUPABASE_SERVICE_KEY || ''
   );
 
-  // Single query with join
-  const { data: users } = await supabase
+  // Query 1: Get user
+  const { data: users, error: userError } = await supabase
     .from("users")
-    .select(`
-      *,
-      user_flights!inner(*)
-    `)
+    .select("*")
     .eq("phone_number", phone_number)
-    .gte("user_flights.flight_date", new Date().toISOString().split("T")[0])
-    .order("user_flights.flight_date", { ascending: true })
-    .limit(1);
+    .single();
   
-  const user = users?.[0];
-  const flight = user?.user_flights?.[0];
+  console.log("User query result:", users, "error:", userError);
+
+  if (!users) {
+    return res.json({
+      dynamic_variables: {
+        caller_name: "there",
+        flight_number: "",
+        origin: "",
+        destination: "",
+        departure_time: "",
+        home_airport: ""
+      }
+    });
+  }
+
+  // Query 2: Get flight
+  const { data: flights, error: flightError } = await supabase
+    .from("user_flights")
+    .select("*")
+    .eq("user_id", users.id)
+    .gte("flight_date", new Date().toISOString().split("T")[0])
+    .order("flight_date", { ascending: true })
+    .limit(1);
+
+  console.log("Flight query result:", flights, "error:", flightError);
+  
+  const flight = flights?.[0];
 
   const response = {
     dynamic_variables: {
-      caller_name: user?.name || "there",
+      caller_name: users.name || "there",
       flight_number: flight?.flight_number || "",
       origin: flight?.origin || "",
       destination: flight?.destination || "",
       departure_time: flight?.departure_time || "",
-      home_airport: user?.home_airport || ""
+      home_airport: users.home_airport || ""
     }
   };
   
   console.log("Response time:", Date.now() - startTime, "ms");
   return res.json(response);
 });
+ 
 const PORT = process.env.PORT || 3002;
 
 // Start server first
