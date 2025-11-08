@@ -165,16 +165,7 @@ app.post("/api/user-context", async (req, res) => {
   const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
   
   if (!phone_number) {
-    return res.json({
-      dynamic_variables: {
-        caller_name: "there",
-        flight_number: "",
-        origin: "",
-        destination: "",
-        departure_time: "",
-        home_airport: ""
-      }
-    });
+    return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
   }
 
   const supabase = createClient(
@@ -182,44 +173,37 @@ app.post("/api/user-context", async (req, res) => {
     process.env.SUPABASE_SERVICE_KEY || ''
   );
 
-  // Get user with their most recent flight in ONE query using a join
-  const { data, error } = await supabase
+  // Query 1: Just get user ID and name
+  const { data: user } = await supabase
     .from("users")
-    .select(`
-      name,
-      home_airport,
-      user_flights!inner(flight_number, origin, destination, departure_time)
-    `)
+    .select("id, name, home_airport")
     .eq("phone_number", phone_number)
-    .order("user_flights(flight_date)", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  console.log("Query result:", data, "Time:", Date.now() - startTime, "ms");
-
-  if (!data) {
-    return res.json({
-      dynamic_variables: {
-        caller_name: "there",
-        flight_number: "",
-        origin: "",
-        destination: "",
-        departure_time: "",
-        home_airport: ""
-      }
-    });
+  if (!user) {
+    return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
   }
 
-  const flight = data.user_flights?.[0];
+  // Query 2: Just get most recent flight (no date filter)
+  const { data: flight } = await supabase
+    .from("user_flights")
+    .select("flight_number, origin, destination, departure_time")
+    .eq("user_id", user.id)
+    .order("flight_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  console.log("Response time:", Date.now() - startTime, "ms");
 
   return res.json({
     dynamic_variables: {
-      caller_name: data.name || "there",
+      caller_name: user.name,
       flight_number: flight?.flight_number || "",
       origin: flight?.origin || "",
       destination: flight?.destination || "",
       departure_time: flight?.departure_time || "",
-      home_airport: data.home_airport || ""
+      home_airport: user.home_airport || ""
     }
   });
 });
