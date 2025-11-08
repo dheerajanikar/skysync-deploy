@@ -15,6 +15,12 @@ async function initializeMCP() {
   const transport = new StdioClientTransport({
     command: "node",
     args: ["../mcp-server/dist/index.js"],
+    env: {
+      ...process.env,
+      FLIGHTAWARE_API_KEY: process.env.FLIGHTAWARE_API_KEY || '',
+      SUPABASE_URL: process.env.SUPABASE_URL || '',
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY || '',
+    },
   });
 
   mcpClient = new Client(
