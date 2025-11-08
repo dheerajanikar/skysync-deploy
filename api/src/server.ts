@@ -9,7 +9,11 @@ import { spawn } from "child_process";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    console.log("Raw buffer:", buf.toString());
+  }
+}));
 
 let mcpClient: Client | null = null;
 
