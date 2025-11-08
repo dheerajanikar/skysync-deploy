@@ -158,64 +158,39 @@ app.get("/api/user-context/:phone_number", async (req, res) => {
 // Dynamic webhook for Telnyx
 app.post("/api/user-context", async (req, res) => {
   const startTime = Date.now();
-  console.log("=== TELNYX WEBHOOK CALLED ===");
-  console.log("Full request body:", JSON.stringify(req.body, null, 2));
-  
   const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
-  console.log("Extracted phone:", phone_number);
-
+  
   const supabase = createClient(
     process.env.SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_KEY || ''
   );
 
+  // Single query with join
   const { data: users } = await supabase
     .from("users")
-    .select("*")
-    .eq("phone_number", phone_number);
+    .select(`
+      *,
+      user_flights!inner(*)
+    `)
+    .eq("phone_number", phone_number)
+    .gte("user_flights.flight_date", new Date().toISOString().split("T")[0])
+    .order("user_flights.flight_date", { ascending: true })
+    .limit(1);
   
   const user = users?.[0];
-  console.log("Found user:", user);
-
-  if (!user) {
-    const response = {
-      dynamic_variables: {
-        caller_name: "there",
-        flight_number: "",
-        origin: "",
-        destination: "",
-        departure_time: "",
-        home_airport: ""
-      }
-    };
-    console.log("Sending response (no user):", response);
-    console.log("Response time:", Date.now() - startTime, "ms");
-    return res.json(response);
-  }
-
-  const { data: flight } = await supabase
-    .from("user_flights")
-    .select("*")
-    .eq("user_id", user.id)
-    .gte("flight_date", new Date().toISOString().split("T")[0])
-    .order("flight_date", { ascending: true })
-    .limit(1)
-    .single();
-
-  console.log("Found flight:", flight);
+  const flight = user?.user_flights?.[0];
 
   const response = {
     dynamic_variables: {
-      caller_name: user.name,
+      caller_name: user?.name || "there",
       flight_number: flight?.flight_number || "",
       origin: flight?.origin || "",
       destination: flight?.destination || "",
       departure_time: flight?.departure_time || "",
-      home_airport: user.home_airport
+      home_airport: user?.home_airport || ""
     }
   };
   
-  console.log("Sending response:", response);
   console.log("Response time:", Date.now() - startTime, "ms");
   return res.json(response);
 });
