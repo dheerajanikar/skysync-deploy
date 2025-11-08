@@ -16,11 +16,7 @@ const supabase = createClient(
 );
 
 
-app.use(express.json({
-  verify: (req, res, buf) => {
-    console.log("Raw buffer:", buf.toString());
-  }
-}));
+app.use(express.json());
 
 let mcpClient: Client | null = null;
 
