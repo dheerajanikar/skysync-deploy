@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+dotenv.config();
 import { spawn } from "child_process";
 
 const app = express();
@@ -12,6 +15,13 @@ let mcpClient: Client | null = null;
 
 // Initialize MCP client connection
 async function initializeMCP() {
+
+  console.log("ENV CHECK:", {
+    hasFlightAware: !!process.env.FLIGHTAWARE_API_KEY,
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasSupabaseKey: !!process.env.SUPABASE_SERVICE_KEY
+  });
+
   const transport = new StdioClientTransport({
     command: "node",
     args: ["../mcp-server/dist/index.js"],
@@ -89,8 +99,60 @@ app.get("/health", (req, res) => {
   console.log("Health check hit");
   res.json({ status: "ok" });
 });
+// User context webhook
+app.get("/api/user-context/:phone_number", async (req, res) => {
+  const { phone_number } = req.params;
 
-const PORT = process.env.PORT || 3001;
+  console.log("Looking for phone:", phone_number);
+
+  // We need to import and initialize Supabase here
+  const supabase = createClient(
+    process.env.SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_KEY || ''
+  );
+
+  // Find user
+  const { data: users, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("phone_number", phone_number);
+  
+  const user = users?.[0];
+
+  if (!user) {
+    return res.json({
+      caller_name: "there",
+      phone_number: phone_number,
+      flight_number: "",
+      origin: "",
+      destination: "",
+      departure_time: "",
+      home_airport: ""
+    });
+  }
+
+  // Find their next flight
+  const { data: flight, error: flightError } = await supabase
+    .from("user_flights")
+    .select("*")
+    .eq("user_id", user.id)
+    .gte("flight_date", new Date().toISOString().split("T")[0])
+    .order("flight_date", { ascending: true })
+    .limit(1)
+    .single();
+
+  return res.json({
+    caller_name: user.name,
+    phone_number: phone_number,
+    flight_number: flight?.flight_number || "",
+    origin: flight?.origin || "",
+    destination: flight?.destination || "",
+    departure_time: flight?.departure_time || "",
+    home_airport: user.home_airport
+  });
+});
+
+const PORT = process.env.PORT || 3002;
 
 // Start server first
 app.listen(PORT, () => {
