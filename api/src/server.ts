@@ -154,17 +154,14 @@ app.get("/api/user-context/:phone_number", async (req, res) => {
 
 // Dynamic webhook for Telnyx
 // Dynamic webhook for Telnyx
+// Dynamic webhook for Telnyx
 app.post("/api/user-context", async (req, res) => {
   console.log("=== TELNYX WEBHOOK CALLED ===");
   console.log("Full request body:", JSON.stringify(req.body, null, 2));
-  console.log("Headers:", JSON.stringify(req.headers, null, 2));
   
-  const phone_number = req.body.caller_phone_number 
-    || req.body.phone_number 
-    || req.body.from 
-    || req.body.caller_id
-    || req.body.call_control_id;
-
+  // Telnyx sends: data.payload.telnyx_end_user_target
+  const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
+  
   console.log("Extracted phone:", phone_number);
 
   const supabase = createClient(
@@ -181,13 +178,14 @@ app.post("/api/user-context", async (req, res) => {
 
   if (!user) {
     return res.json({
-      caller_name: "there",
-      phone_number: phone_number,
-      flight_number: "",
-      origin: "",
-      destination: "",
-      departure_time: "",
-      home_airport: ""
+      dynamic_variables: {
+        caller_name: "there",
+        flight_number: "",
+        origin: "",
+        destination: "",
+        departure_time: "",
+        home_airport: ""
+      }
     });
   }
 
@@ -201,16 +199,16 @@ app.post("/api/user-context", async (req, res) => {
     .single();
 
   return res.json({
-    caller_name: user.name,
-    phone_number: phone_number,
-    flight_number: flight?.flight_number || "",
-    origin: flight?.origin || "",
-    destination: flight?.destination || "",
-    departure_time: flight?.departure_time || "",
-    home_airport: user.home_airport
+    dynamic_variables: {
+      caller_name: user.name,
+      flight_number: flight?.flight_number || "",
+      origin: flight?.origin || "",
+      destination: flight?.destination || "",
+      departure_time: flight?.departure_time || "",
+      home_airport: user.home_airport
+    }
   });
 });
-
 const PORT = process.env.PORT || 3002;
 
 // Start server first
