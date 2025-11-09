@@ -274,6 +274,13 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
     .limit(1)
     .maybeSingle();
 
+  const currentDate = new Date().toISOString().split('T')[0]; // "2025-11-08"
+  const currentDay = new Date().toLocaleDateString('en-US', { 
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+      timeZone: 'America/Los_Angeles'
+  }); // "Friday, November 8, 2025"
+  
+  
   console.log("Dynamic ctx time:", Date.now() - start, "ms");
 
   return res.json({
