@@ -106,6 +106,22 @@ app.get("/health", (req, res) => {
   console.log("Health check hit");
   res.json({ status: "ok" });
 });
+
+// List available tools endpoint (for Telnyx MCP discovery)
+app.get("/tools", async (req, res) => {
+  if (!mcpClient) {
+    return res.status(503).json({ error: "MCP client not ready" });
+  }
+  
+  try {
+    const result = await mcpClient.listTools();
+    console.log("Listed tools:", result);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error listing tools:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 // User context webhook
 app.get("/api/user-context/:phone_number", async (req, res) => {
   const { phone_number } = req.params;
