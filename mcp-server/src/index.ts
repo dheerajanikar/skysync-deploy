@@ -273,13 +273,7 @@ class SkySyncMCPServer {
     const { origin, destination } = args;
   
     try {
-      // Use direct route endpoint - much better!
-      const now = new Date();
-      const twoDaysLater = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
-      
-      const startISO = now.toISOString();
-      const endISO = twoDaysLater.toISOString();
-  
+      // Use direct route endpoint without date params (use defaults)
       const response = await axios.get(
         `${this.flightAwareBaseUrl}/airports/${origin}/flights/to/${destination}`,
         {
@@ -289,8 +283,6 @@ class SkySyncMCPServer {
           params: {
             type: "Airline",
             connection: "nonstop",
-            start: startISO,
-            end: endISO,
             max_pages: 3,
           },
         }
@@ -306,7 +298,7 @@ class SkySyncMCPServer {
               text: JSON.stringify({
                 route: `${origin} to ${destination}`,
                 flights: [],
-                message: "No nonstop flights found on this route in the next 2 days",
+                message: "No nonstop flights found on this route",
               }),
             },
           ],
@@ -330,7 +322,6 @@ class SkySyncMCPServer {
               route: `${origin} to ${destination}`,
               count: flights.length,
               flights: flights,
-              timeframe: "next 2 days"
             }, null, 2),
           },
         ],
