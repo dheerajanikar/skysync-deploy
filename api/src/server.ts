@@ -244,6 +244,13 @@ app.get("/api/user-context/:phone_number", requireAuth, async (req: Request, res
 // Dynamic variables (POST)
 app.post("/api/user-context", requireAuth, async (req: Request, res: Response) => {
   const start = Date.now();
+
+  console.log('=== TELNYX WEBHOOK DATA ===');
+  console.log('telnyx_current_time:', req.body?.data?.payload?.telnyx_current_time);
+  console.log('Full payload keys:', Object.keys(req.body?.data?.payload ?? {}));
+  console.log('===========================');
+
+  
   const body = req.body ?? {};
   const payload = body.data?.payload ?? body.payload ?? {};
   const phone_number =
