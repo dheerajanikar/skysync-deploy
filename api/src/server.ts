@@ -121,7 +121,11 @@ app.post("/tools", requireAuth, async (req: Request, res: Response) => {
         }
       });
     }
-    
+
+    if (method === "notifications/initialized" || method?.startsWith("notifications/")) {
+      return res.status(200).json({});
+    }
+
     if (method === "tools/list" || method === "list") {
       const result = await mcpClient.listTools();
       return res.json({ jsonrpc: "2.0", id, result });
