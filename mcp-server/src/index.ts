@@ -273,22 +273,22 @@ class SkySyncMCPServer {
     const { origin, destination } = args;
   
     try {
-      // Get current time and next 14 days
+      // Use direct route endpoint - much better!
       const now = new Date();
-      const twoWeeksLater = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
+      const twoDaysLater = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
       
       const startISO = now.toISOString();
-      const endISO = twoWeeksLater.toISOString();
+      const endISO = twoDaysLater.toISOString();
   
-      // Get scheduled departures from origin airport
       const response = await axios.get(
-        `${this.flightAwareBaseUrl}/airports/${origin}/flights/scheduled_departures`,
+        `${this.flightAwareBaseUrl}/airports/${origin}/flights/to/${destination}`,
         {
           headers: {
             "x-apikey": this.flightAwareApiKey,
           },
           params: {
             type: "Airline",
+            connection: "nonstop",
             start: startISO,
             end: endISO,
             max_pages: 3,
@@ -296,22 +296,9 @@ class SkySyncMCPServer {
         }
       );
   
-      const allFlights = response.data.scheduled_departures || [];
+      const allFlights = response.data.flights || [];
       
-      // Filter for flights going to the destination AND departing in the future
-      const matchingFlights = allFlights.filter((flight: any) => {
-        const matchesDestination = 
-          flight.destination?.code_iata === destination || 
-          flight.destination?.code_icao === destination;
-        
-        // Only include flights that haven't departed yet
-        const departureTime = new Date(flight.scheduled_out || flight.estimated_out);
-        const isFuture = departureTime > now;
-        
-        return matchesDestination && isFuture;
-      });
-  
-      if (matchingFlights.length === 0) {
+      if (allFlights.length === 0) {
         return {
           content: [
             {
@@ -319,18 +306,19 @@ class SkySyncMCPServer {
               text: JSON.stringify({
                 route: `${origin} to ${destination}`,
                 flights: [],
-                message: "No upcoming flights found on this route in the next 14 days",
+                message: "No nonstop flights found on this route in the next 2 days",
               }),
             },
           ],
         };
       }
   
-      const flights = matchingFlights.slice(0, 8).map((flight: any) => ({
-        flight_number: flight.ident,
+      // Map flights to simple format
+      const flights = allFlights.slice(0, 8).map((flight: any) => ({
+        flight_number: flight.ident || flight.ident_icao,
         airline: flight.operator_iata || flight.operator || "Unknown",
-        departure_time: flight.scheduled_out || flight.estimated_out,
-        arrival_time: flight.scheduled_in || flight.estimated_in,
+        departure_time: flight.scheduled_out || flight.estimated_out || flight.scheduled_off,
+        arrival_time: flight.scheduled_in || flight.estimated_in || flight.scheduled_on,
         status: flight.status || "Scheduled",
       }));
   
@@ -342,12 +330,13 @@ class SkySyncMCPServer {
               route: `${origin} to ${destination}`,
               count: flights.length,
               flights: flights,
-              timeframe: "next 14 days"
+              timeframe: "next 2 days"
             }, null, 2),
           },
         ],
       };
     } catch (error: any) {
+      console.error("FlightAware API error:", error.response?.data || error.message);
       return {
         content: [
           {
