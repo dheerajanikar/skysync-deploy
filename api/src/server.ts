@@ -143,7 +143,7 @@ app.post("/tools", requireAuth, async (req: Request, res: Response) => {
         name: params.name, 
         arguments: params.arguments ?? {} 
       });
-      return res.json({ jsonrpc: "2.0", id, result: normalizeToolResult(result) });
+      return res.json({ jsonrpc: "2.0", id, result});
     }
     
     return res.status(400).json({ 
