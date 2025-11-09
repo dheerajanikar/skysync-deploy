@@ -122,6 +122,60 @@ app.get("/tools", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// MCP endpoint for tool calls (JSON-RPC 2.0 format)
+app.post("/mcp", async (req, res) => {
+  console.log("MCP endpoint hit:", req.body);
+  
+  if (!mcpClient) {
+    return res.status(503).json({ 
+      jsonrpc: "2.0",
+      id: req.body.id,
+      error: { code: -32000, message: "MCP client not ready" }
+    });
+  }
+  
+  try {
+    const { method, params, id } = req.body;
+    
+    if (method === "tools/list") {
+      const result = await mcpClient.listTools();
+      return res.json({
+        jsonrpc: "2.0",
+        id,
+        result
+      });
+    }
+    
+    if (method === "tools/call") {
+      console.log("Calling tool:", params.name, "with args:", params.arguments);
+      const result = await mcpClient.callTool({
+        name: params.name,
+        arguments: params.arguments
+      });
+      console.log("Tool result:", result);
+      return res.json({
+        jsonrpc: "2.0",
+        id,
+        result
+      });
+    }
+    
+    res.status(400).json({
+      jsonrpc: "2.0",
+      id,
+      error: { code: -32601, message: "Method not found" }
+    });
+  } catch (error: any) {
+    console.error("MCP endpoint error:", error);
+    res.status(500).json({
+      jsonrpc: "2.0",
+      id: req.body.id,
+      error: { code: -32000, message: error.message }
+    });
+  }
+});
+
 // User context webhook
 app.get("/api/user-context/:phone_number", async (req, res) => {
   const { phone_number } = req.params;
@@ -176,9 +230,6 @@ app.get("/api/user-context/:phone_number", async (req, res) => {
 });
 
 // Dynamic webhook for Telnyx
-// Dynamic webhook for Telnyx
-// Dynamic webhook for Telnyx
-// Dynamic webhook for Telnyx
 app.post("/api/user-context", async (req, res) => {
   const startTime = Date.now();
   const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
@@ -186,8 +237,6 @@ app.post("/api/user-context", async (req, res) => {
   if (!phone_number) {
     return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
   }
-
-  
 
   // Query 1: Just get user ID and name
   const { data: user } = await supabase
