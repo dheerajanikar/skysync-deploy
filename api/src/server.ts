@@ -104,6 +104,24 @@ app.post("/tools", requireAuth, async (req: Request, res: Response) => {
   const { method, params, id } = req.body ?? {};
   
   try {
+
+    if (method === "initialize") {
+      return res.json({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          protocolVersion: "2025-06-18",
+          serverInfo: {
+            name: "skysync-mcp-server",
+            version: "1.0.0"
+          },
+          capabilities: {
+            tools: {}
+          }
+        }
+      });
+    }
+    
     if (method === "tools/list" || method === "list") {
       const result = await mcpClient.listTools();
       return res.json({ jsonrpc: "2.0", id, result });
