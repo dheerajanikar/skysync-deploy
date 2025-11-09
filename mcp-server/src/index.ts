@@ -286,6 +286,8 @@ class SkySyncMCPServer {
           },
         }
       );
+
+      console.log("Full API response:", JSON.stringify(response.data, null, 2));
   
       const allFlights = response.data.flights || [];
       
