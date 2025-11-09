@@ -273,7 +273,6 @@ class SkySyncMCPServer {
     const { origin, destination } = args;
   
     try {
-      // Use direct route endpoint without date params (use defaults)
       const response = await axios.get(
         `${this.flightAwareBaseUrl}/airports/${origin}/flights/to/${destination}`,
         {
@@ -290,6 +289,9 @@ class SkySyncMCPServer {
   
       const allFlights = response.data.flights || [];
       
+      // DEBUG: Log the first flight to see structure
+      console.log("Sample flight structure:", JSON.stringify(allFlights[0], null, 2));
+      
       if (allFlights.length === 0) {
         return {
           content: [
@@ -305,14 +307,17 @@ class SkySyncMCPServer {
         };
       }
   
-      // Map flights to simple format
-      const flights = allFlights.slice(0, 8).map((flight: any) => ({
-        flight_number: flight.ident || flight.ident_icao,
-        airline: flight.operator_iata || flight.operator || "Unknown",
-        departure_time: flight.scheduled_out || flight.estimated_out || flight.scheduled_off,
-        arrival_time: flight.scheduled_in || flight.estimated_in || flight.scheduled_on,
-        status: flight.status || "Scheduled",
-      }));
+      // Map flights - try different field paths
+      const flights = allFlights.slice(0, 8).map((flight: any) => {
+        console.log("Processing flight:", JSON.stringify(flight, null, 2));
+        return {
+          flight_number: flight.ident || flight.ident_icao || flight.flight_number || "Unknown",
+          airline: flight.operator_iata || flight.operator_icao || flight.operator || "Unknown",
+          departure_time: flight.scheduled_out || flight.estimated_out || flight.scheduled_off || "Unknown",
+          arrival_time: flight.scheduled_in || flight.estimated_in || flight.scheduled_on || "Unknown",
+          status: flight.status || "Scheduled",
+        };
+      });
   
       return {
         content: [
