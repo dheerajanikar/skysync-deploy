@@ -1,5 +1,4 @@
-// 1) keep this as .ts and compile, or run with ts-node and "type":"module"
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -22,19 +21,8 @@ let mcpClient: Client | null = null;
 
 const MCP_COMMAND = process.env.MCP_COMMAND ?? "node";
 const MCP_ARGS = process.env.MCP_ARGS
-  ? JSON.parse(process.env.MCP_ARGS) // ex: '["/abs/path/to/index.js"]'
+  ? JSON.parse(process.env.MCP_ARGS)
   : ["../mcp-server/dist/index.js"];
-
-const transport = new StdioClientTransport({
-  command: MCP_COMMAND,
-  args: MCP_ARGS,
-  env: {
-    ...process.env,
-    FLIGHTAWARE_API_KEY: process.env.FLIGHTAWARE_API_KEY ?? "",
-    SUPABASE_URL: process.env.SUPABASE_URL ?? "",
-    SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ?? "",
-  },
-});
 
 function normalizeToolResult(result: any) {
   if (!result) return result;
@@ -57,46 +45,41 @@ async function initializeMCP() {
     hasSupabaseKey: !!process.env.SUPABASE_SERVICE_KEY
   });
 
+  const transport = new StdioClientTransport({
+    command: MCP_COMMAND,
+    args: MCP_ARGS,
+    env: {
+      ...process.env,
+      FLIGHTAWARE_API_KEY: process.env.FLIGHTAWARE_API_KEY ?? "",
+      SUPABASE_URL: process.env.SUPABASE_URL ?? "",
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ?? "",
+    },
+  });
+
   mcpClient = new Client(
     { name: "skysync-http-client", version: "1.0.0" },
     { capabilities: {} }
   );
 
-  // reconnect on error/close
-  mcpClient.on("close", () => {
-    console.warn("MCP connection closed; attempting reconnect...");
-    connectMCPWithRetry();
-  });
-
-  await connectMCPWithRetry();
-}
-
-async function connectMCPWithRetry(attempt = 0) {
-  try {
-    await mcpClient!.connect(transport);
-    console.log("Connected to MCP server");
-  } catch (e) {
-    const backoff = Math.min(30000, 1000 * (attempt + 1));
-    console.warn(`MCP connect failed, retrying in ${backoff}ms`, e);
-    setTimeout(() => connectMCPWithRetry(attempt + 1), backoff);
-  }
+  await mcpClient.connect(transport);
+  console.log("Connected to MCP server");
 }
 
 // ---- Simple bearer auth for sensitive routes ----
-function requireAuth(req, res, next) {
+function requireAuth(req: Request, res: Response, next: NextFunction) {
   const expected = process.env.INTERNAL_BEARER;
-  if (!expected) return next(); // optional
+  if (!expected) return next();
   const got = req.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (got !== expected) return res.status(401).json({ error: "unauthorized" });
   next();
 }
 
 // ---- Routes ----
-app.get("/health", (_req, res) => {
+app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", mcpReady: !!mcpClient });
 });
 
-app.get("/tools", requireAuth, async (_req, res) => {
+app.get("/tools", requireAuth, async (_req: Request, res: Response) => {
   if (!mcpClient) return res.status(503).json({ error: "MCP client not ready" });
   try {
     const result = await mcpClient.listTools();
@@ -106,7 +89,7 @@ app.get("/tools", requireAuth, async (_req, res) => {
   }
 });
 
-app.post("/tools/:toolName", requireAuth, async (req, res) => {
+app.post("/tools/:toolName", requireAuth, async (req: Request, res: Response) => {
   if (!mcpClient) return res.status(503).json({ error: "MCP client not ready" });
   try {
     const result = await mcpClient.callTool({
@@ -120,7 +103,7 @@ app.post("/tools/:toolName", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/resources", requireAuth, async (req, res) => {
+app.get("/resources", requireAuth, async (req: Request, res: Response) => {
   if (!mcpClient) return res.status(503).json({ error: "MCP client not ready" });
   const uri = String(req.query.uri ?? "");
   if (!uri) return res.status(400).json({ error: "uri query parameter required" });
@@ -133,7 +116,7 @@ app.get("/resources", requireAuth, async (req, res) => {
 });
 
 // JSON-RPC 2.0 shim (for Telnyx MCP)
-app.post("/mcp", requireAuth, async (req, res) => {
+app.post("/mcp", requireAuth, async (req: Request, res: Response) => {
   const { method, params, id } = req.body ?? {};
   if (!mcpClient) {
     return res.status(503).json({ jsonrpc: "2.0", id, error: { code: -32000, message: "MCP client not ready" }});
@@ -156,7 +139,7 @@ app.post("/mcp", requireAuth, async (req, res) => {
 });
 
 // User context (GET)
-app.get("/api/user-context/:phone_number", requireAuth, async (req, res) => {
+app.get("/api/user-context/:phone_number", requireAuth, async (req: Request, res: Response) => {
   const { phone_number } = req.params;
   const { data: users } = await supabase
     .from("users")
@@ -187,7 +170,7 @@ app.get("/api/user-context/:phone_number", requireAuth, async (req, res) => {
 });
 
 // Dynamic variables (POST)
-app.post("/api/user-context", requireAuth, async (req, res) => {
+app.post("/api/user-context", requireAuth, async (req: Request, res: Response) => {
   const start = Date.now();
   const body = req.body ?? {};
   const payload = body.data?.payload ?? body.payload ?? {};
