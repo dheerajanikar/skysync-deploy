@@ -1,3 +1,4 @@
+// 1) keep this as .ts and compile, or run with ts-node and "type":"module"
 import express from "express";
 import cors from "cors";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -5,240 +6,200 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 dotenv.config();
-import { spawn } from "child_process";
 
 const app = express();
 app.use(cors());
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_KEY || ''
-);
-
-
 app.use(express.json());
 
+// ---- Supabase (single instance) ----
+const supabase = createClient(
+  process.env.SUPABASE_URL ?? "",
+  process.env.SUPABASE_SERVICE_KEY ?? ""
+);
+
+// ---- MCP setup ----
 let mcpClient: Client | null = null;
 
-// Initialize MCP client connection
-async function initializeMCP() {
+const MCP_COMMAND = process.env.MCP_COMMAND ?? "node";
+const MCP_ARGS = process.env.MCP_ARGS
+  ? JSON.parse(process.env.MCP_ARGS) // ex: '["/abs/path/to/index.js"]'
+  : ["../mcp-server/dist/index.js"];
 
+const transport = new StdioClientTransport({
+  command: MCP_COMMAND,
+  args: MCP_ARGS,
+  env: {
+    ...process.env,
+    FLIGHTAWARE_API_KEY: process.env.FLIGHTAWARE_API_KEY ?? "",
+    SUPABASE_URL: process.env.SUPABASE_URL ?? "",
+    SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ?? "",
+  },
+});
+
+function normalizeToolResult(result: any) {
+  if (!result) return result;
+  if (Array.isArray(result.content)) {
+    try {
+      return result.content.map((c: any) =>
+        typeof c.text === "string" ? c.text : JSON.stringify(c)
+      ).join("");
+    } catch {
+      return result;
+    }
+  }
+  return result;
+}
+
+async function initializeMCP() {
   console.log("ENV CHECK:", {
     hasFlightAware: !!process.env.FLIGHTAWARE_API_KEY,
     hasSupabaseUrl: !!process.env.SUPABASE_URL,
     hasSupabaseKey: !!process.env.SUPABASE_SERVICE_KEY
   });
 
-  const transport = new StdioClientTransport({
-    command: "node",
-    args: ["../mcp-server/dist/index.js"],
-    env: {
-      ...process.env,
-      FLIGHTAWARE_API_KEY: process.env.FLIGHTAWARE_API_KEY || '',
-      SUPABASE_URL: process.env.SUPABASE_URL || '',
-      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY || '',
-    },
+  mcpClient = new Client(
+    { name: "skysync-http-client", version: "1.0.0" },
+    { capabilities: {} }
+  );
+
+  // reconnect on error/close
+  mcpClient.on("close", () => {
+    console.warn("MCP connection closed; attempting reconnect...");
+    connectMCPWithRetry();
   });
 
-  mcpClient = new Client(
-    {
-      name: "skysync-http-client",
-      version: "1.0.0",
-    },
-    {
-      capabilities: {},
-    }
-  );
-
-  await mcpClient.connect(transport);
-  console.log("Connected to MCP server");
+  await connectMCPWithRetry();
 }
 
-// Tool calling endpoint
-app.post("/tools/:toolName", async (req, res) => {
-  console.log("Received request:", req.params.toolName, req.body);
-  
-  if (!mcpClient) {
-    return res.status(503).json({ error: "MCP client not ready" });
-  }
-  
+async function connectMCPWithRetry(attempt = 0) {
   try {
-    const { toolName } = req.params;
-    const args = req.body;
-
-    console.log("Calling MCP tool...");
-    const result = await mcpClient.callTool({
-      name: toolName,
-      arguments: args,
-    });
-
-    console.log("Got result:", result);
-    res.json(result);
-  } catch (error: any) {
-    console.error("Error:", error);
-    res.status(500).json({ error: error.message });
+    await mcpClient!.connect(transport);
+    console.log("Connected to MCP server");
+  } catch (e) {
+    const backoff = Math.min(30000, 1000 * (attempt + 1));
+    console.warn(`MCP connect failed, retrying in ${backoff}ms`, e);
+    setTimeout(() => connectMCPWithRetry(attempt + 1), backoff);
   }
+}
+
+// ---- Simple bearer auth for sensitive routes ----
+function requireAuth(req, res, next) {
+  const expected = process.env.INTERNAL_BEARER;
+  if (!expected) return next(); // optional
+  const got = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+  if (got !== expected) return res.status(401).json({ error: "unauthorized" });
+  next();
+}
+
+// ---- Routes ----
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", mcpReady: !!mcpClient });
 });
 
-// Resource reading endpoint
-app.get("/resources", async (req, res) => {
-  if (!mcpClient) {
-    return res.status(503).json({ error: "MCP client not ready" });
-  }
-  
-  try {
-    const uri = req.query.uri as string;
-
-    if (!uri) {
-      return res.status(400).json({ error: "uri query parameter required" });
-    }
-
-    const result = await mcpClient.readResource({ uri });
-
-    res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Health check
-app.get("/health", (req, res) => {
-  console.log("Health check hit");
-  res.json({ status: "ok" });
-});
-
-// List available tools endpoint (for Telnyx MCP discovery)
-app.get("/tools", async (req, res) => {
-  if (!mcpClient) {
-    return res.status(503).json({ error: "MCP client not ready" });
-  }
-  
+app.get("/tools", requireAuth, async (_req, res) => {
+  if (!mcpClient) return res.status(503).json({ error: "MCP client not ready" });
   try {
     const result = await mcpClient.listTools();
-    console.log("Listed tools:", result);
     res.json(result);
-  } catch (error: any) {
-    console.error("Error listing tools:", error);
-    res.status(500).json({ error: error.message });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 
-// MCP endpoint for tool calls (JSON-RPC 2.0 format)
-app.post("/mcp", async (req, res) => {
-  console.log("MCP endpoint hit:", req.body);
-  
-  if (!mcpClient) {
-    return res.status(503).json({ 
-      jsonrpc: "2.0",
-      id: req.body.id,
-      error: { code: -32000, message: "MCP client not ready" }
-    });
-  }
-  
+app.post("/tools/:toolName", requireAuth, async (req, res) => {
+  if (!mcpClient) return res.status(503).json({ error: "MCP client not ready" });
   try {
-    const { method, params, id } = req.body;
-    
+    const result = await mcpClient.callTool({
+      name: req.params.toolName,
+      arguments: req.body ?? {},
+    });
+    res.json({ result: normalizeToolResult(result) });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/resources", requireAuth, async (req, res) => {
+  if (!mcpClient) return res.status(503).json({ error: "MCP client not ready" });
+  const uri = String(req.query.uri ?? "");
+  if (!uri) return res.status(400).json({ error: "uri query parameter required" });
+  try {
+    const result = await mcpClient.readResource({ uri });
+    res.json(result);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// JSON-RPC 2.0 shim (for Telnyx MCP)
+app.post("/mcp", requireAuth, async (req, res) => {
+  const { method, params, id } = req.body ?? {};
+  if (!mcpClient) {
+    return res.status(503).json({ jsonrpc: "2.0", id, error: { code: -32000, message: "MCP client not ready" }});
+  }
+  try {
     if (method === "tools/list") {
       const result = await mcpClient.listTools();
-      return res.json({
-        jsonrpc: "2.0",
-        id,
-        result
-      });
+      return res.json({ jsonrpc: "2.0", id, result });
     }
-    
     if (method === "tools/call") {
-      console.log("Calling tool:", params.name, "with args:", params.arguments);
-      const result = await mcpClient.callTool({
-        name: params.name,
-        arguments: params.arguments
-      });
-      console.log("Tool result:", result);
-      return res.json({
-        jsonrpc: "2.0",
-        id,
-        result
-      });
+      if (!params?.name) return res.status(400).json({ jsonrpc: "2.0", id, error: { code: -32602, message: "Invalid params" }});
+      const result = await mcpClient.callTool({ name: params.name, arguments: params.arguments ?? {} });
+      return res.json({ jsonrpc: "2.0", id, result: normalizeToolResult(result) });
     }
-    
-    res.status(400).json({
-      jsonrpc: "2.0",
-      id,
-      error: { code: -32601, message: "Method not found" }
-    });
-  } catch (error: any) {
-    console.error("MCP endpoint error:", error);
-    res.status(500).json({
-      jsonrpc: "2.0",
-      id: req.body.id,
-      error: { code: -32000, message: error.message }
-    });
+    return res.status(400).json({ jsonrpc: "2.0", id, error: { code: -32601, message: "Method not found" }});
+  } catch (e: any) {
+    console.error("MCP endpoint error:", e);
+    res.status(500).json({ jsonrpc: "2.0", id, error: { code: -32000, message: e.message }});
   }
 });
 
-// User context webhook
-app.get("/api/user-context/:phone_number", async (req, res) => {
+// User context (GET)
+app.get("/api/user-context/:phone_number", requireAuth, async (req, res) => {
   const { phone_number } = req.params;
-
-  console.log("Looking for phone:", phone_number);
-
-  // We need to import and initialize Supabase here
-  const supabase = createClient(
-    process.env.SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-  );
-
-  // Find user
-  const { data: users, error } = await supabase
+  const { data: users } = await supabase
     .from("users")
     .select("*")
-    .eq("phone_number", phone_number);
-  
+    .eq("phone_number", phone_number)
+    .limit(1);
   const user = users?.[0];
-
   if (!user) {
-    return res.json({
-      caller_name: "there",
-      phone_number: phone_number,
-      flight_number: "",
-      origin: "",
-      destination: "",
-      departure_time: "",
-      home_airport: ""
-    });
+    return res.json({ caller_name: "there", phone_number, flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" });
   }
-
-  // Find their next flight
-  const { data: flight, error: flightError } = await supabase
+  const { data: flight } = await supabase
     .from("user_flights")
     .select("*")
     .eq("user_id", user.id)
-    .gte("flight_date", new Date().toISOString().split("T")[0])
+    .gte("flight_date", new Date().toISOString().slice(0,10))
     .order("flight_date", { ascending: true })
     .limit(1)
     .single();
-
   return res.json({
     caller_name: user.name,
-    phone_number: phone_number,
-    flight_number: flight?.flight_number || "",
-    origin: flight?.origin || "",
-    destination: flight?.destination || "",
-    departure_time: flight?.departure_time || "",
-    home_airport: user.home_airport
+    phone_number,
+    flight_number: flight?.flight_number ?? "",
+    origin: flight?.origin ?? "",
+    destination: flight?.destination ?? "",
+    departure_time: flight?.departure_time ?? "",
+    home_airport: user.home_airport ?? ""
   });
 });
 
-// Dynamic webhook for Telnyx
-app.post("/api/user-context", async (req, res) => {
-  const startTime = Date.now();
-  const phone_number = req.body?.data?.payload?.telnyx_end_user_target;
-  
+// Dynamic variables (POST)
+app.post("/api/user-context", requireAuth, async (req, res) => {
+  const start = Date.now();
+  const body = req.body ?? {};
+  const payload = body.data?.payload ?? body.payload ?? {};
+  const phone_number =
+    payload.telnyx_end_user_target ??
+    payload.from?.number ?? payload.from ??
+    payload.to?.number ?? payload.to ?? null;
+
   if (!phone_number) {
     return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
   }
 
-  // Query 1: Just get user ID and name
   const { data: user } = await supabase
     .from("users")
     .select("id, name, home_airport")
@@ -250,35 +211,29 @@ app.post("/api/user-context", async (req, res) => {
     return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
   }
 
-  // Query 2: Just get most recent flight (no date filter)
   const { data: flight } = await supabase
     .from("user_flights")
-    .select("flight_number, origin, destination, departure_time")
+    .select("flight_number, origin, destination, departure_time, flight_date")
     .eq("user_id", user.id)
     .order("flight_date", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  console.log("Response time:", Date.now() - startTime, "ms");
+  console.log("Dynamic ctx time:", Date.now() - start, "ms");
 
   return res.json({
     dynamic_variables: {
       caller_name: user.name,
-      flight_number: flight?.flight_number || "",
-      origin: flight?.origin || "",
-      destination: flight?.destination || "",
-      departure_time: flight?.departure_time || "",
-      home_airport: user.home_airport || ""
+      flight_number: flight?.flight_number ?? "",
+      origin: flight?.origin ?? "",
+      destination: flight?.destination ?? "",
+      departure_time: flight?.departure_time ?? "",
+      home_airport: user.home_airport ?? ""
     }
   });
 });
- 
-const PORT = process.env.PORT || 3002;
 
-// Start server first
-app.listen(PORT, () => {
-  console.log(`HTTP API running on port ${PORT}`);
-});
-
-// Then initialize MCP
+// Start
+const PORT = process.env.PORT ?? 3002;
+app.listen(PORT, () => console.log(`HTTP API on :${PORT}`));
 initializeMCP().catch(console.error);
