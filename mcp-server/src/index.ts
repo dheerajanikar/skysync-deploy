@@ -273,6 +273,13 @@ class SkySyncMCPServer {
     const { origin, destination } = args;
   
     try {
+      // Get current time and next 14 days
+      const now = new Date();
+      const twoWeeksLater = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
+      
+      const startISO = now.toISOString();
+      const endISO = twoWeeksLater.toISOString();
+  
       // Get scheduled departures from origin airport
       const response = await axios.get(
         `${this.flightAwareBaseUrl}/airports/${origin}/flights/scheduled_departures`,
@@ -282,18 +289,27 @@ class SkySyncMCPServer {
           },
           params: {
             type: "Airline",
-            max_pages: 1,
+            start: startISO,
+            end: endISO,
+            max_pages: 3,
           },
         }
       );
   
       const allFlights = response.data.scheduled_departures || [];
       
-      // Filter for flights going to the destination
-      const matchingFlights = allFlights.filter((flight: any) => 
-        flight.destination?.code_iata === destination || 
-        flight.destination?.code_icao === destination
-      );
+      // Filter for flights going to the destination AND departing in the future
+      const matchingFlights = allFlights.filter((flight: any) => {
+        const matchesDestination = 
+          flight.destination?.code_iata === destination || 
+          flight.destination?.code_icao === destination;
+        
+        // Only include flights that haven't departed yet
+        const departureTime = new Date(flight.scheduled_out || flight.estimated_out);
+        const isFuture = departureTime > now;
+        
+        return matchesDestination && isFuture;
+      });
   
       if (matchingFlights.length === 0) {
         return {
@@ -303,14 +319,14 @@ class SkySyncMCPServer {
               text: JSON.stringify({
                 route: `${origin} to ${destination}`,
                 flights: [],
-                message: "No direct flights found on this route today",
+                message: "No upcoming flights found on this route in the next 14 days",
               }),
             },
           ],
         };
       }
   
-      const flights = matchingFlights.slice(0, 5).map((flight: any) => ({
+      const flights = matchingFlights.slice(0, 8).map((flight: any) => ({
         flight_number: flight.ident,
         airline: flight.operator_iata || flight.operator || "Unknown",
         departure_time: flight.scheduled_out || flight.estimated_out,
@@ -326,6 +342,7 @@ class SkySyncMCPServer {
               route: `${origin} to ${destination}`,
               count: flights.length,
               flights: flights,
+              timeframe: "next 14 days"
             }, null, 2),
           },
         ],
@@ -344,6 +361,7 @@ class SkySyncMCPServer {
       };
     }
   }
+  
   
   private async logUserQuery(args: any) {
     const { user_phone, query, flight_info } = args;
