@@ -89,6 +89,56 @@ app.get("/tools", requireAuth, async (_req: Request, res: Response) => {
   }
 });
 
+// POST /tools - MCP endpoint for listing and calling tools
+app.post("/tools", requireAuth, async (req: Request, res: Response) => {
+  console.log("POST /tools received:", JSON.stringify(req.body, null, 2));
+  
+  if (!mcpClient) {
+    return res.status(503).json({ 
+      jsonrpc: "2.0", 
+      id: req.body?.id, 
+      error: { code: -32000, message: "MCP client not ready" }
+    });
+  }
+  
+  const { method, params, id } = req.body ?? {};
+  
+  try {
+    if (method === "tools/list" || method === "list") {
+      const result = await mcpClient.listTools();
+      return res.json({ jsonrpc: "2.0", id, result });
+    }
+    
+    if (method === "tools/call" || method === "call") {
+      if (!params?.name) {
+        return res.status(400).json({ 
+          jsonrpc: "2.0", 
+          id, 
+          error: { code: -32602, message: "Invalid params: name required" }
+        });
+      }
+      const result = await mcpClient.callTool({ 
+        name: params.name, 
+        arguments: params.arguments ?? {} 
+      });
+      return res.json({ jsonrpc: "2.0", id, result: normalizeToolResult(result) });
+    }
+    
+    return res.status(400).json({ 
+      jsonrpc: "2.0", 
+      id, 
+      error: { code: -32601, message: `Method not found: ${method}` }
+    });
+  } catch (e: any) {
+    console.error("POST /tools error:", e);
+    return res.status(500).json({ 
+      jsonrpc: "2.0", 
+      id, 
+      error: { code: -32000, message: e.message }
+    });
+  }
+});
+
 app.post("/tools/:toolName", requireAuth, async (req: Request, res: Response) => {
   if (!mcpClient) return res.status(503).json({ error: "MCP client not ready" });
   try {
