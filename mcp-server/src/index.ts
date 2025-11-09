@@ -208,10 +208,11 @@ class SkySyncMCPServer {
       
   }
 
+  // ADD THIS METHOD - it was missing!
   private async getFlightStatus(args: any) {
     const { airline_code, flight_number } = args;
     const flightIdent = `${airline_code}${flight_number}`;
-  
+
     try {
       const response = await axios.get(
         `${this.flightAwareBaseUrl}/flights/${flightIdent}`,
@@ -224,31 +225,34 @@ class SkySyncMCPServer {
           },
         }
       );
-  
-      const flights = response.data.flights;
-      if (!flights || flights.length === 0) {
+
+      const flights = response.data.flights || [];
+      if (flights.length === 0) {
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ error: `No flight found for ${flightIdent}` }),
+              text: JSON.stringify({
+                error: "Flight not found",
+                flight: flightIdent,
+              }),
             },
           ],
         };
       }
-  
+
       const flight = flights[0];
       const flightInfo = {
         ident: flight.ident,
-        status: flight.status || "Unknown",
-        origin: flight.origin?.code_iata || flight.origin?.code_icao || "Unknown",
-        destination: flight.destination?.code_iata || flight.destination?.code_icao || "Unknown",
-        scheduled_departure: flight.scheduled_off || "Unknown",
-        scheduled_arrival: flight.scheduled_on || "Unknown",
+        status: flight.status,
+        origin: flight.origin?.code_iata || flight.origin?.code,
+        destination: flight.destination?.code_iata || flight.destination?.code,
+        scheduled_departure: flight.scheduled_off,
+        scheduled_arrival: flight.scheduled_on,
         actual_departure: flight.actual_off,
         estimated_arrival: flight.estimated_on,
       };
-  
+
       return {
         content: [
           {
@@ -262,13 +266,15 @@ class SkySyncMCPServer {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ error: `FlightAware API error: ${error.message}` }),
+            text: JSON.stringify({
+              error: `FlightAware API error: ${error.message}`,
+            }),
           },
         ],
       };
     }
   }
-  
+
   private async searchFlightsByRoute(args: any) {
     const { origin, destination } = args;
   
@@ -287,16 +293,50 @@ class SkySyncMCPServer {
         }
       );
   
-      // RETURN RAW DATA TO DEBUG
+      const allFlights = response.data.flights || [];
+      
+      if (allFlights.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                route: `${origin} to ${destination}`,
+                flights: [],
+                message: "No nonstop flights found on this route",
+              }),
+            },
+          ],
+        };
+      }
+  
+      // Extract first segment from each flight
+      const flights = allFlights
+        .map((flight: any) => flight.segments?.[0])
+        .filter((segment: any) => segment) // Remove any null/undefined
+        .slice(0, 8)
+        .map((segment: any) => ({
+          flight_number: segment.ident_iata || segment.ident,
+          airline: segment.operator_iata || segment.operator,
+          departure_time: segment.scheduled_out || segment.estimated_out,
+          arrival_time: segment.scheduled_in || segment.estimated_in,
+          status: segment.status,
+        }));
+  
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(response.data, null, 2),
+            text: JSON.stringify({
+              route: `${origin} to ${destination}`,
+              count: flights.length,
+              flights: flights,
+            }, null, 2),
           },
         ],
       };
     } catch (error: any) {
+      console.error("FlightAware API error:", error.response?.data || error.message);
       return {
         content: [
           {
