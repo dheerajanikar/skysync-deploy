@@ -272,18 +272,70 @@ class SkySyncMCPServer {
   private async searchFlightsByRoute(args: any) {
     const { origin, destination } = args;
   
-    // TODO: Implement FlightAware API call
-    return {
-      content: [
+    try {
+      const response = await axios.get(
+        `${this.flightAwareBaseUrl}/flights/search`,
         {
-          type: "text",
-          text: JSON.stringify({
-            route: `${origin} to ${destination}`,
-            flights: ["DL123", "AA456", "UA789"],
-          }),
-        },
-      ],
-    };
+          headers: {
+            "x-apikey": this.flightAwareApiKey,
+          },
+          params: {
+            query: `-origin ${origin} -destination ${destination}`,
+            max_pages: 1,
+          },
+        }
+      );
+  
+      const flights = response.data.flights || [];
+      
+      if (flights.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                route: `${origin} to ${destination}`,
+                flights: [],
+                message: "No flights found for this route",
+              }),
+            },
+          ],
+        };
+      }
+  
+      const normalizedFlights = flights.slice(0, 5).map((flight: any) => ({
+        ident: flight.ident,
+        operator: flight.operator_iata || flight.operator || "Unknown",
+        status: flight.status || "Unknown",
+        departure_time: flight.scheduled_off || flight.estimated_off || null,
+        arrival_time: flight.scheduled_on || flight.estimated_on || null,
+      }));
+  
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              route: `${origin} to ${destination}`,
+              count: normalizedFlights.length,
+              flights: normalizedFlights,
+            }, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: `FlightAware API error: ${error.message}`,
+              route: `${origin} to ${destination}`,
+            }),
+          },
+        ],
+      };
+    }
   }
   
   private async logUserQuery(args: any) {
