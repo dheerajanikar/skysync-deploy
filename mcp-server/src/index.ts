@@ -314,7 +314,7 @@ class SkySyncMCPServer {
       const flights = allFlights
         .map((flight: any) => flight.segments?.[0])
         .filter((segment: any) => segment) // Remove any null/undefined
-        .slice(0, 8)
+        
         .map((segment: any) => ({
           flight_number: segment.ident_iata || segment.ident,
           airline: segment.operator_iata || segment.operator,
