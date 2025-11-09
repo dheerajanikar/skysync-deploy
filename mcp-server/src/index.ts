@@ -273,22 +273,29 @@ class SkySyncMCPServer {
     const { origin, destination } = args;
   
     try {
+      // Get scheduled departures from origin airport
       const response = await axios.get(
-        `${this.flightAwareBaseUrl}/flights/search`,
+        `${this.flightAwareBaseUrl}/airports/${origin}/flights/scheduled_departures`,
         {
           headers: {
             "x-apikey": this.flightAwareApiKey,
           },
           params: {
-            query: `-origin ${origin} -destination ${destination}`,
+            type: "Airline",
             max_pages: 1,
           },
         }
       );
   
-      const flights = response.data.flights || [];
+      const allFlights = response.data.scheduled_departures || [];
       
-      if (flights.length === 0) {
+      // Filter for flights going to the destination
+      const matchingFlights = allFlights.filter((flight: any) => 
+        flight.destination?.code_iata === destination || 
+        flight.destination?.code_icao === destination
+      );
+  
+      if (matchingFlights.length === 0) {
         return {
           content: [
             {
@@ -296,19 +303,19 @@ class SkySyncMCPServer {
               text: JSON.stringify({
                 route: `${origin} to ${destination}`,
                 flights: [],
-                message: "No flights found for this route",
+                message: "No direct flights found on this route today",
               }),
             },
           ],
         };
       }
   
-      const normalizedFlights = flights.slice(0, 5).map((flight: any) => ({
-        ident: flight.ident,
-        operator: flight.operator_iata || flight.operator || "Unknown",
-        status: flight.status || "Unknown",
-        departure_time: flight.scheduled_off || flight.estimated_off || null,
-        arrival_time: flight.scheduled_on || flight.estimated_on || null,
+      const flights = matchingFlights.slice(0, 5).map((flight: any) => ({
+        flight_number: flight.ident,
+        airline: flight.operator_iata || flight.operator || "Unknown",
+        departure_time: flight.scheduled_out || flight.estimated_out,
+        arrival_time: flight.scheduled_in || flight.estimated_in,
+        status: flight.status || "Scheduled",
       }));
   
       return {
@@ -317,8 +324,8 @@ class SkySyncMCPServer {
             type: "text",
             text: JSON.stringify({
               route: `${origin} to ${destination}`,
-              count: normalizedFlights.length,
-              flights: normalizedFlights,
+              count: flights.length,
+              flights: flights,
             }, null, 2),
           },
         ],
@@ -329,7 +336,7 @@ class SkySyncMCPServer {
           {
             type: "text",
             text: JSON.stringify({
-              error: `FlightAware API error: ${error.message}`,
+              error: `Could not retrieve flights: ${error.message}`,
               route: `${origin} to ${destination}`,
             }),
           },
