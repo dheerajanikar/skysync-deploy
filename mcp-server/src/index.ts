@@ -11,6 +11,8 @@ import {
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import { Resend } from 'resend';
+
 import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
@@ -38,6 +40,7 @@ class SkySyncMCPServer {
   private supabase;
   private flightAwareApiKey: string;
   private flightAwareBaseUrl: string = "https://aeroapi.flightaware.com/aeroapi";
+  private resend = new Resend(process.env.RESEND_API_KEY);
 
 
   constructor() {
@@ -144,6 +147,28 @@ class SkySyncMCPServer {
               required: ["phone_number", "message"],
             },
           },
+          {
+            name: "send_flight_email",
+            description: "Send flight information via email to the user",
+            inputSchema: {
+              type: "object",
+              properties: {
+                email: {
+                  type: "string",
+                  description: "User's email address",
+                },
+                subject: {
+                  type: "string",
+                  description: "Email subject line",
+                },
+                flight_details: {
+                  type: "string",
+                  description: "Flight information to send (formatted text)",
+                },
+              },
+              required: ["email", "subject", "flight_details"],
+            },
+          },
         ],
       }));
 
@@ -161,6 +186,8 @@ class SkySyncMCPServer {
             return await this.logUserQuery(args);
             case "send_flight_sms":  // ADD THIS CASE
             return await this.sendFlightSms(args);
+            case "send_flight_email":
+            return await this.sendFlightEmail(args);
             default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -557,6 +584,53 @@ class SkySyncMCPServer {
       };
     } catch (error: any) {
       console.error('SMS error:', error.response?.data || error.message);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ 
+            success: false, 
+            error: error.message 
+          })
+        }]
+      };
+    }
+  }
+
+  private async sendFlightEmail(args: any) {
+    const { email, subject, flight_details } = args;
+    
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: 'SkySync <onboarding@resend.dev>',  // Use your verified domain later
+        to: email,
+        subject: subject,
+        text: flight_details,
+      });
+  
+      if (error) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ 
+              success: false, 
+              error: error.message 
+            })
+          }]
+        };
+      }
+  
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ 
+            success: true, 
+            message: "Email sent successfully",
+            email_id: data?.id
+          })
+        }]
+      };
+    } catch (error: any) {
+      console.error('Email error:', error);
       return {
         content: [{
           type: "text",
