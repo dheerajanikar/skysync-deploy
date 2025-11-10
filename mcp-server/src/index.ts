@@ -17,6 +17,22 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+import { DateTime } from 'luxon';
+const AIRPORT_TIMEZONES: Record<string, string> = {
+  'SFO': 'America/Los_Angeles', 'LAX': 'America/Los_Angeles',
+  'SAN': 'America/Los_Angeles', 'SEA': 'America/Los_Angeles',
+  'PDX': 'America/Los_Angeles', 'LAS': 'America/Los_Angeles',
+  'OAK': 'America/Los_Angeles', 'SJC': 'America/Los_Angeles',
+  'DEN': 'America/Denver', 'SLC': 'America/Denver',
+  'PHX': 'America/Phoenix',
+  'DFW': 'America/Chicago', 'ORD': 'America/Chicago',
+  'IAH': 'America/Chicago', 'MSP': 'America/Chicago',
+  'JFK': 'America/New_York', 'LGA': 'America/New_York',
+  'EWR': 'America/New_York', 'BOS': 'America/New_York',
+  'ATL': 'America/New_York', 'MIA': 'America/New_York',
+  'IAD': 'America/New_York', 'DCA': 'America/New_York',
+};
+
 class SkySyncMCPServer {
   private server: Server;
   private supabase;
@@ -310,18 +326,36 @@ class SkySyncMCPServer {
         };
       }
   
-      // Extract first segment from each flight
+      // Get timezones for origin and destination
+      const originTz = AIRPORT_TIMEZONES[origin] || 'America/Los_Angeles';
+      const destTz = AIRPORT_TIMEZONES[destination] || 'America/Los_Angeles';
+  
+      // Extract and convert times
       const flights = allFlights
         .map((flight: any) => flight.segments?.[0])
-        .filter((segment: any) => segment) // Remove any null/undefined
-        
-        .map((segment: any) => ({
-          flight_number: segment.ident_iata || segment.ident,
-          airline: segment.operator_iata || segment.operator,
-          departure_time: segment.scheduled_out || segment.estimated_out,
-          arrival_time: segment.scheduled_in || segment.estimated_in,
-          status: segment.status,
-        }));
+        .filter((segment: any) => segment)
+        .map((segment: any) => {
+          // Convert UTC times to local airport times
+          const departureLocal = segment.scheduled_out 
+            ? DateTime.fromISO(segment.scheduled_out, { zone: 'UTC' })
+                .setZone(originTz)
+                .toFormat('h:mm a')
+            : 'Unknown';
+          
+          const arrivalLocal = segment.scheduled_in
+            ? DateTime.fromISO(segment.scheduled_in, { zone: 'UTC' })
+                .setZone(destTz)
+                .toFormat('h:mm a')
+            : 'Unknown';
+  
+          return {
+            flight_number: segment.ident_iata || segment.ident,
+            airline: segment.operator_iata || segment.operator,
+            departure_time: departureLocal,
+            arrival_time: arrivalLocal,
+            status: segment.status,
+          };
+        });
   
       return {
         content: [
@@ -329,6 +363,8 @@ class SkySyncMCPServer {
             type: "text",
             text: JSON.stringify({
               route: `${origin} to ${destination}`,
+              origin_timezone: originTz,
+              destination_timezone: destTz,
               count: flights.length,
               flights: flights,
             }, null, 2),
