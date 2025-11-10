@@ -251,11 +251,14 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
     payload.from?.number ?? payload.from ??
     payload.to?.number ?? payload.to ?? null;
 
+  console.log(`[${Date.now()}] Webhook called for: ${phone_number}`);
+
   if (!phone_number) {
+    console.log("No phone number, returning default");
     return res.json({ dynamic_variables: { caller_name: "there" }});
   }
 
-  // Query user with optional flight data
+  const queryStart = Date.now();
   const { data: user } = await supabase
     .from("users")
     .select(`
@@ -265,15 +268,14 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
     `)
     .eq("phone_number", phone_number)
     .maybeSingle();
+  
+  console.log(`Query took: ${Date.now() - queryStart}ms`);
 
-  // Get most recent flight if exists
   const flight = user?.user_flights?.sort((a: any, b: any) => 
     new Date(b.flight_date).getTime() - new Date(a.flight_date).getTime()
   )?.[0];
   
-  console.log("Dynamic ctx time:", Date.now() - start, "ms");
-
-  return res.json({
+  const response = {
     dynamic_variables: {
       caller_name: user?.name || "there",
       flight_number: flight?.flight_number ?? "",
@@ -282,7 +284,10 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
       departure_time: flight?.departure_time ?? "",
       home_airport: user?.home_airport ?? ""
     }
-  });
+  };
+
+  console.log(`Total time: ${Date.now() - start}ms, responding now`);
+  return res.json(response);
 });
 
 // Start
