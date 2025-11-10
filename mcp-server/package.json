@@ -19,9 +19,11 @@
     "@modelcontextprotocol/sdk": "^1.21.1",
     "@supabase/supabase-js": "^2.80.0",
     "axios": "^1.13.2",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "luxon": "^3.7.2"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.1",
     "@types/node": "^24.10.0",
     "typescript": "^5.9.3"
   }
