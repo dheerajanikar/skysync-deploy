@@ -255,20 +255,21 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
     return res.json({ dynamic_variables: { caller_name: "there" }});
   }
 
-  // Single optimized query with join
+  // Query user with optional flight data
   const { data: user } = await supabase
     .from("users")
     .select(`
       name, 
       home_airport,
-      user_flights!inner(flight_number, origin, destination, departure_time)
+      user_flights(flight_number, origin, destination, departure_time, flight_date)
     `)
     .eq("phone_number", phone_number)
-    .order("user_flights(flight_date)", { ascending: false })
-    .limit(1)
     .maybeSingle();
 
-  const flight = user?.user_flights?.[0];
+  // Get most recent flight if exists
+  const flight = user?.user_flights?.sort((a: any, b: any) => 
+    new Date(b.flight_date).getTime() - new Date(a.flight_date).getTime()
+  )?.[0];
   
   console.log("Dynamic ctx time:", Date.now() - start, "ms");
 
