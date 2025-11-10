@@ -126,6 +126,24 @@ class SkySyncMCPServer {
               required: ["user_phone", "query"],
             },
           },
+          {
+            name: "send_flight_sms",
+            description: "Send flight information via SMS to the user",
+            inputSchema: {
+              type: "object",
+              properties: {
+                phone_number: {
+                  type: "string",
+                  description: "User's phone number in E.164 format",
+                },
+                message: {
+                  type: "string",
+                  description: "Flight details to send via SMS",
+                },
+              },
+              required: ["phone_number", "message"],
+            },
+          },
         ],
       }));
 
@@ -141,6 +159,8 @@ class SkySyncMCPServer {
             return await this.searchFlightsByRoute(args);
             case "log_user_query":
             return await this.logUserQuery(args);
+            case "send_flight_sms":  // ADD THIS CASE
+            return await this.sendFlightSms(args);
             default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -505,6 +525,50 @@ class SkySyncMCPServer {
       };
     }
   }
+
+  private async sendFlightSms(args: any) {
+    const { phone_number, message } = args;
+    
+    try {
+      const response = await axios.post(
+        'https://api.telnyx.com/v2/messages',
+        {
+          from: '+12138986347',
+          to: phone_number,
+          text: message,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.TELNYX_API_KEY}`,
+          }
+        }
+      );
+  
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ 
+            success: true, 
+            message: "SMS sent successfully" 
+          })
+        }]
+      };
+    } catch (error: any) {
+      console.error('SMS error:', error.response?.data || error.message);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ 
+            success: false, 
+            error: error.message 
+          })
+        }]
+      };
+    }
+  }
+
+
 
   async run() {
     const transport = new StdioServerTransport();
