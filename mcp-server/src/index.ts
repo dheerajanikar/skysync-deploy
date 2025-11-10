@@ -536,6 +536,7 @@ class SkySyncMCPServer {
           from: '+12138986347',
           to: phone_number,
           text: message,
+          messaging_profile_id: '40019a5c-5425-463a-8448-91f434dd550c'
         },
         {
           headers: {
