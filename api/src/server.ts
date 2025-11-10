@@ -261,7 +261,7 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
   const queryStart = Date.now();
   const { data: user } = await supabase
     .from("users")
-    .select("name, home_airport")
+    .select("name, home_airport, email")
     .eq("phone_number", phone_number)
     .maybeSingle();
   
@@ -272,7 +272,8 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
   const response = {
     dynamic_variables: {
       caller_name: user?.name || "there",
-      home_airport: user?.home_airport ?? ""
+      home_airport: user?.home_airport ?? "",
+      user_email: user?.email ?? "" 
     }
   };
 
