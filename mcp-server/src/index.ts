@@ -275,7 +275,7 @@ class SkySyncMCPServer {
   private async getFlightStatus(args: any) {
     const { airline_code, flight_number } = args;
     const flightIdent = `${airline_code}${flight_number}`;
-
+  
     try {
       const response = await axios.get(
         `${this.flightAwareBaseUrl}/flights/${flightIdent}`,
@@ -288,7 +288,7 @@ class SkySyncMCPServer {
           },
         }
       );
-
+  
       const flights = response.data.flights || [];
       if (flights.length === 0) {
         return {
@@ -303,19 +303,46 @@ class SkySyncMCPServer {
           ],
         };
       }
-
+  
       const flight = flights[0];
+      
+      // Get timezones for origin and destination
+      const originCode = flight.origin?.code_iata || flight.origin?.code;
+      const destCode = flight.destination?.code_iata || flight.destination?.code;
+      const originTz = AIRPORT_TIMEZONES[originCode] || 'America/Los_Angeles';
+      const destTz = AIRPORT_TIMEZONES[destCode] || 'America/Los_Angeles';
+  
+      // Convert times
+      const departureLocal = flight.scheduled_off
+        ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
+            .setZone(originTz)
+            .toFormat('h:mm a ZZZZ')
+        : 'Unknown';
+      
+      const departureDate = flight.scheduled_off
+        ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
+            .setZone(originTz)
+            .toFormat('MMM d, yyyy')
+        : 'Unknown';
+  
+      const arrivalLocal = flight.scheduled_on
+        ? DateTime.fromISO(flight.scheduled_on, { zone: 'UTC' })
+            .setZone(destTz)
+            .toFormat('h:mm a ZZZZ')
+        : 'Unknown';
+  
       const flightInfo = {
         ident: flight.ident,
         status: flight.status,
-        origin: flight.origin?.code_iata || flight.origin?.code,
-        destination: flight.destination?.code_iata || flight.destination?.code,
-        scheduled_departure: flight.scheduled_off,
-        scheduled_arrival: flight.scheduled_on,
+        origin: originCode,
+        destination: destCode,
+        departure_date: departureDate,
+        departure_time: departureLocal,
+        arrival_time: arrivalLocal,
         actual_departure: flight.actual_off,
         estimated_arrival: flight.estimated_on,
       };
-
+  
       return {
         content: [
           {
