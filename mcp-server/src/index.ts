@@ -304,7 +304,7 @@ class SkySyncMCPServer {
           params: {
             type: "Airline",
             connection: "nonstop",
-            max_pages: 1,
+            max_pages: 3,
           },
         }
       );
