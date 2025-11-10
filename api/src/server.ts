@@ -244,13 +244,6 @@ app.get("/api/user-context/:phone_number", requireAuth, async (req: Request, res
 // Dynamic variables (POST)
 app.post("/api/user-context", requireAuth, async (req: Request, res: Response) => {
   const start = Date.now();
-
-  console.log('=== TELNYX WEBHOOK DATA ===');
-  console.log('telnyx_current_time:', req.body?.data?.payload?.telnyx_current_time);
-  console.log('Full payload keys:', Object.keys(req.body?.data?.payload ?? {}));
-  console.log('===========================');
-
-  
   const body = req.body ?? {};
   const payload = body.data?.payload ?? body.payload ?? {};
   const phone_number =
@@ -259,45 +252,34 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
     payload.to?.number ?? payload.to ?? null;
 
   if (!phone_number) {
-    return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
+    return res.json({ dynamic_variables: { caller_name: "there" }});
   }
 
+  // Single optimized query with join
   const { data: user } = await supabase
     .from("users")
-    .select("id, name, home_airport")
+    .select(`
+      name, 
+      home_airport,
+      user_flights!inner(flight_number, origin, destination, departure_time)
+    `)
     .eq("phone_number", phone_number)
+    .order("user_flights(flight_date)", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!user) {
-    return res.json({ dynamic_variables: { caller_name: "there", flight_number: "", origin: "", destination: "", departure_time: "", home_airport: "" }});
-  }
-
-  const { data: flight } = await supabase
-    .from("user_flights")
-    .select("flight_number, origin, destination, departure_time, flight_date")
-    .eq("user_id", user.id)
-    .order("flight_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const currentDate = new Date().toISOString().split('T')[0]; // "2025-11-08"
-  const currentDay = new Date().toLocaleDateString('en-US', { 
-      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-      timeZone: 'America/Los_Angeles'
-  }); // "Friday, November 8, 2025"
-  
+  const flight = user?.user_flights?.[0];
   
   console.log("Dynamic ctx time:", Date.now() - start, "ms");
 
   return res.json({
     dynamic_variables: {
-      caller_name: user.name,
+      caller_name: user?.name || "there",
       flight_number: flight?.flight_number ?? "",
       origin: flight?.origin ?? "",
       destination: flight?.destination ?? "",
       departure_time: flight?.departure_time ?? "",
-      home_airport: user.home_airport ?? ""
+      home_airport: user?.home_airport ?? ""
     }
   });
 });
