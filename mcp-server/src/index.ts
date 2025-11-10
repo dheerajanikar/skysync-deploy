@@ -33,6 +33,7 @@ const AIRPORT_TIMEZONES: Record<string, string> = {
   'EWR': 'America/New_York', 'BOS': 'America/New_York',
   'ATL': 'America/New_York', 'MIA': 'America/New_York',
   'IAD': 'America/New_York', 'DCA': 'America/New_York',
+  'HOU': 'America/Chicago',
 };
 
 class SkySyncMCPServer {
