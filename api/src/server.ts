@@ -261,27 +261,17 @@ app.post("/api/user-context", requireAuth, async (req: Request, res: Response) =
   const queryStart = Date.now();
   const { data: user } = await supabase
     .from("users")
-    .select(`
-      name, 
-      home_airport,
-      user_flights(flight_number, origin, destination, departure_time, flight_date)
-    `)
+    .select("name, home_airport")
     .eq("phone_number", phone_number)
     .maybeSingle();
   
   console.log(`Query took: ${Date.now() - queryStart}ms`);
 
-  const flight = user?.user_flights?.sort((a: any, b: any) => 
-    new Date(b.flight_date).getTime() - new Date(a.flight_date).getTime()
-  )?.[0];
+  
   
   const response = {
     dynamic_variables: {
       caller_name: user?.name || "there",
-      flight_number: flight?.flight_number ?? "",
-      origin: flight?.origin ?? "",
-      destination: flight?.destination ?? "",
-      departure_time: flight?.departure_time ?? "",
       home_airport: user?.home_airport ?? ""
     }
   };
