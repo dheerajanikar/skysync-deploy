@@ -106,7 +106,7 @@ class SkySyncMCPServer {
           },
           {
             name: "log_user_query",
-            description: "Log user's flight query to database",
+            description: "Log user's flight search to database. Save searches like 'SFO to LAX' with flight details including flight_number, origin, destination, departure_time as JSON string.",
             inputSchema: {
               type: "object",
               properties: {
