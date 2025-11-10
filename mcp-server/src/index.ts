@@ -347,12 +347,23 @@ class SkySyncMCPServer {
                 .setZone(destTz)
                 .toFormat('h:mm a')
             : 'Unknown';
-  
+        
+          const departureDate = segment.scheduled_out
+            ? DateTime.fromISO(segment.scheduled_out, { zone: 'UTC' })
+                .setZone(originTz)
+                .toFormat('MMM d, yyyy')
+            : 'Unknown';
+        
           return {
             flight_number: segment.ident_iata || segment.ident,
             airline: segment.operator_iata || segment.operator,
+            departure_date: departureDate,
             departure_time: departureLocal,
             arrival_time: arrivalLocal,
+            departure_gate: segment.gate_origin || null,
+            arrival_gate: segment.gate_destination || null,
+            departure_delay_minutes: segment.departure_delay || 0,
+            arrival_delay_minutes: segment.arrival_delay || 0,
             status: segment.status,
           };
         });
