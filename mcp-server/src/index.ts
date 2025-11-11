@@ -439,20 +439,16 @@ class SkySyncMCPServer {
   
       const now = DateTime.utc();
   
-      // Filter for upcoming flights (not yet departed OR currently in flight)
+      // Filter for upcoming flights
       const upcomingFlights = flights
         .filter((f: any) => {
-          // If not departed yet
           if (!f.actual_off) {
             const scheduledOff = DateTime.fromISO(f.scheduled_off, { zone: 'UTC' });
-            // Include all future flights OR flights scheduled within last 3 hours (might be delayed)
             return scheduledOff > now.minus({ hours: 3 });
           }
           
-          // If departed but not landed yet (in flight)
           if (f.actual_off && !f.actual_on) return true;
           
-          // If landed, only include if landed within last hour (recent arrival)
           if (f.actual_on) {
             const landedTime = DateTime.fromISO(f.actual_on, { zone: 'UTC' });
             return now.diff(landedTime, 'hours').hours < 1;
@@ -461,7 +457,6 @@ class SkySyncMCPServer {
           return false;
         })
         .sort((a: any, b: any) => {
-          // Sort by scheduled_off (earliest first)
           const aTime = a.scheduled_off;
           const bTime = b.scheduled_off;
           if (!aTime) return 1;
@@ -483,54 +478,58 @@ class SkySyncMCPServer {
         };
       }
   
-      const flight = upcomingFlights[0];
-      
-      // Get timezones for origin and destination
-      const originCode = flight.origin?.code_iata || flight.origin?.code;
-      const destCode = flight.destination?.code_iata || flight.destination?.code;
-      const originTz = AIRPORT_TIMEZONES[originCode] || 'America/Los_Angeles';
-      const destTz = AIRPORT_TIMEZONES[destCode] || 'America/Los_Angeles';
+      // Return up to 3 upcoming flights
+      const flightsToReturn = upcomingFlights.slice(0, 3).map((f: any) => {
+        const originCode = f.origin?.code_iata || f.origin?.code;
+        const destCode = f.destination?.code_iata || f.destination?.code;
+        const originTz = AIRPORT_TIMEZONES[originCode] || 'America/Los_Angeles';
+        const destTz = AIRPORT_TIMEZONES[destCode] || 'America/Los_Angeles';
   
-      // Convert times
-      const departureLocal = flight.scheduled_off
-        ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
-            .setZone(originTz)
-            .toFormat('h:mm a ZZZZ')
-        : 'Unknown';
-      
-      const departureDate = flight.scheduled_off
-        ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
-            .setZone(originTz)
-            .toFormat('MMM d, yyyy')
-        : 'Unknown';
+        const departureLocal = f.scheduled_off
+          ? DateTime.fromISO(f.scheduled_off, { zone: 'UTC' })
+              .setZone(originTz)
+              .toFormat('h:mm a ZZZZ')
+          : 'Unknown';
+        
+        const departureDate = f.scheduled_off
+          ? DateTime.fromISO(f.scheduled_off, { zone: 'UTC' })
+              .setZone(originTz)
+              .toFormat('MMM d, yyyy')
+          : 'Unknown';
   
-      const arrivalLocal = flight.scheduled_on
-        ? DateTime.fromISO(flight.scheduled_on, { zone: 'UTC' })
-            .setZone(destTz)
-            .toFormat('h:mm a ZZZZ')
-        : 'Unknown';
+        const arrivalLocal = f.scheduled_on
+          ? DateTime.fromISO(f.scheduled_on, { zone: 'UTC' })
+              .setZone(destTz)
+              .toFormat('h:mm a ZZZZ')
+          : 'Unknown';
   
-      const flightInfo = {
-        ident: flight.ident,
-        status: flight.status,
-        origin: originCode,
-        destination: destCode,
-        departure_date: departureDate,
-        departure_time: departureLocal,
-        arrival_time: arrivalLocal,
-        gate_origin: flight.gate_origin,
-        gate_destination: flight.gate_destination,
-        departure_delay: flight.departure_delay,
-        arrival_delay: flight.arrival_delay,
-        actual_departure: flight.actual_off,
-        estimated_arrival: flight.estimated_on,
+        return {
+          ident: f.ident,
+          status: f.status,
+          origin: originCode,
+          destination: destCode,
+          departure_date: departureDate,
+          departure_time: departureLocal,
+          arrival_time: arrivalLocal,
+          gate_origin: f.gate_origin,
+          gate_destination: f.gate_destination,
+          departure_delay: f.departure_delay,
+          arrival_delay: f.arrival_delay,
+          actual_departure: f.actual_off,
+          estimated_arrival: f.estimated_on,
+        };
+      });
+  
+      const result = {
+        total_upcoming: upcomingFlights.length,
+        flights: flightsToReturn
       };
   
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(flightInfo, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
