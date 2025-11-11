@@ -273,6 +273,137 @@ class SkySyncMCPServer {
   }
 
   // ADD THIS METHOD - it was missing!
+  // private async getFlightStatus(args: any) {
+  //   const { airline_code, flight_number } = args;
+  //   const flightIdent = `${airline_code}${flight_number}`;
+  
+  //   try {
+  //     const response = await axios.get(
+  //       `${this.flightAwareBaseUrl}/flights/${flightIdent}`,
+  //       {
+  //         headers: {
+  //           "x-apikey": this.flightAwareApiKey,
+  //         },
+  //         params: {
+  //           max_pages: 1,
+  //         },
+  //       }
+  //     );
+  
+  //     const flights = response.data.flights || [];
+
+  //     console.log('=== ALL FLIGHTS RETURNED ===');
+  //     console.log(JSON.stringify(flights, null, 2));
+  //     console.log('=== TOTAL COUNT:', flights.length);
+  //     if (flights.length === 0) {
+  //       return {
+  //         content: [
+  //           {
+  //             type: "text",
+  //             text: JSON.stringify({
+  //               error: "Flight not found",
+  //               flight: flightIdent,
+  //             }),
+  //           },
+  //         ],
+  //       };
+  //     }
+  
+  //     // Filter out flights that have already landed and sort by departure time
+  //     const upcomingFlights = flights
+  //       .filter((f: any) => {
+  //         // Keep flights that haven't landed yet (no actual arrival time)
+  //         // OR flights that landed very recently (within last hour)
+  //         if (!f.actual_on) return true;
+          
+  //         const landedTime = DateTime.fromISO(f.actual_on, { zone: 'UTC' });
+  //         const hourAgo = DateTime.utc().minus({ hours: 1 });
+  //         return landedTime > hourAgo;
+  //       })
+  //       .sort((a: any, b: any) => {
+  //         // Sort by scheduled departure time (earliest first)
+  //         const aTime = a.scheduled_off || a.scheduled_out;
+  //         const bTime = b.scheduled_off || b.scheduled_out;
+  //         if (!aTime) return 1;
+  //         if (!bTime) return -1;
+  //         return aTime.localeCompare(bTime);
+  //       });
+  
+  //     if (upcomingFlights.length === 0) {
+  //       return {
+  //         content: [
+  //           {
+  //             type: "text",
+  //             text: JSON.stringify({
+  //               error: "No upcoming flights found",
+  //               flight: flightIdent,
+  //             }),
+  //           },
+  //         ],
+  //       };
+  //     }
+  
+  //     const flight = upcomingFlights[0];
+      
+  //     // Get timezones for origin and destination
+  //     const originCode = flight.origin?.code_iata || flight.origin?.code;
+  //     const destCode = flight.destination?.code_iata || flight.destination?.code;
+  //     const originTz = AIRPORT_TIMEZONES[originCode] || 'America/Los_Angeles';
+  //     const destTz = AIRPORT_TIMEZONES[destCode] || 'America/Los_Angeles';
+  
+  //     // Convert times
+  //     const departureLocal = flight.scheduled_off
+  //       ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
+  //           .setZone(originTz)
+  //           .toFormat('h:mm a ZZZZ')
+  //       : 'Unknown';
+      
+  //     const departureDate = flight.scheduled_off
+  //       ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
+  //           .setZone(originTz)
+  //           .toFormat('MMM d, yyyy')
+  //       : 'Unknown';
+  
+  //     const arrivalLocal = flight.scheduled_on
+  //       ? DateTime.fromISO(flight.scheduled_on, { zone: 'UTC' })
+  //           .setZone(destTz)
+  //           .toFormat('h:mm a ZZZZ')
+  //       : 'Unknown';
+  
+  //     const flightInfo = {
+  //       ident: flight.ident,
+  //       status: flight.status,
+  //       origin: originCode,
+  //       destination: destCode,
+  //       departure_date: departureDate,
+  //       departure_time: departureLocal,
+  //       arrival_time: arrivalLocal,
+  //       actual_departure: flight.actual_off,
+  //       estimated_arrival: flight.estimated_on,
+  //     };
+  
+  //     return {
+  //       content: [
+  //         {
+  //           type: "text",
+  //           text: JSON.stringify(flightInfo, null, 2),
+  //         },
+  //       ],
+  //     };
+  //   } catch (error: any) {
+  //     return {
+  //       content: [
+  //         {
+  //           type: "text",
+  //           text: JSON.stringify({
+  //             error: `FlightAware API error: ${error.message}`,
+  //           }),
+  //         },
+  //       ],
+  //     };
+  //   }
+  // }
+
   private async getFlightStatus(args: any) {
     const { airline_code, flight_number } = args;
     const flightIdent = `${airline_code}${flight_number}`;
@@ -291,102 +422,17 @@ class SkySyncMCPServer {
       );
   
       const flights = response.data.flights || [];
-
-      console.log('=== ALL FLIGHTS RETURNED ===');
-      console.log(JSON.stringify(flights, null, 2));
-      console.log('=== TOTAL COUNT:', flights.length);
-      if (flights.length === 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                error: "Flight not found",
-                flight: flightIdent,
-              }),
-            },
-          ],
-        };
-      }
-  
-      // Filter out flights that have already landed and sort by departure time
-      const upcomingFlights = flights
-        .filter((f: any) => {
-          // Keep flights that haven't landed yet (no actual arrival time)
-          // OR flights that landed very recently (within last hour)
-          if (!f.actual_on) return true;
-          
-          const landedTime = DateTime.fromISO(f.actual_on, { zone: 'UTC' });
-          const hourAgo = DateTime.utc().minus({ hours: 1 });
-          return landedTime > hourAgo;
-        })
-        .sort((a: any, b: any) => {
-          // Sort by scheduled departure time (earliest first)
-          const aTime = a.scheduled_off || a.scheduled_out;
-          const bTime = b.scheduled_off || b.scheduled_out;
-          if (!aTime) return 1;
-          if (!bTime) return -1;
-          return aTime.localeCompare(bTime);
-        });
-  
-      if (upcomingFlights.length === 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                error: "No upcoming flights found",
-                flight: flightIdent,
-              }),
-            },
-          ],
-        };
-      }
-  
-      const flight = upcomingFlights[0];
       
-      // Get timezones for origin and destination
-      const originCode = flight.origin?.code_iata || flight.origin?.code;
-      const destCode = flight.destination?.code_iata || flight.destination?.code;
-      const originTz = AIRPORT_TIMEZONES[originCode] || 'America/Los_Angeles';
-      const destTz = AIRPORT_TIMEZONES[destCode] || 'America/Los_Angeles';
-  
-      // Convert times
-      const departureLocal = flight.scheduled_off
-        ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
-            .setZone(originTz)
-            .toFormat('h:mm a ZZZZ')
-        : 'Unknown';
-      
-      const departureDate = flight.scheduled_off
-        ? DateTime.fromISO(flight.scheduled_off, { zone: 'UTC' })
-            .setZone(originTz)
-            .toFormat('MMM d, yyyy')
-        : 'Unknown';
-  
-      const arrivalLocal = flight.scheduled_on
-        ? DateTime.fromISO(flight.scheduled_on, { zone: 'UTC' })
-            .setZone(destTz)
-            .toFormat('h:mm a ZZZZ')
-        : 'Unknown';
-  
-      const flightInfo = {
-        ident: flight.ident,
-        status: flight.status,
-        origin: originCode,
-        destination: destCode,
-        departure_date: departureDate,
-        departure_time: departureLocal,
-        arrival_time: arrivalLocal,
-        actual_departure: flight.actual_off,
-        estimated_arrival: flight.estimated_on,
-      };
-  
+      // TEMPORARY: Return all flight data for inspection
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(flightInfo, null, 2),
+            text: JSON.stringify({
+              debug: true,
+              total_flights: flights.length,
+              all_flights: flights
+            }, null, 2),
           },
         ],
       };
