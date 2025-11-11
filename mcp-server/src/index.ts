@@ -305,7 +305,41 @@ class SkySyncMCPServer {
         };
       }
   
-      const flight = flights[0];
+      // Filter out flights that have already landed and sort by departure time
+      const upcomingFlights = flights
+        .filter((f: any) => {
+          // Keep flights that haven't landed yet (no actual arrival time)
+          // OR flights that landed very recently (within last hour)
+          if (!f.actual_on) return true;
+          
+          const landedTime = DateTime.fromISO(f.actual_on, { zone: 'UTC' });
+          const hourAgo = DateTime.utc().minus({ hours: 1 });
+          return landedTime > hourAgo;
+        })
+        .sort((a: any, b: any) => {
+          // Sort by scheduled departure time (earliest first)
+          const aTime = a.scheduled_off || a.scheduled_out;
+          const bTime = b.scheduled_off || b.scheduled_out;
+          if (!aTime) return 1;
+          if (!bTime) return -1;
+          return aTime.localeCompare(bTime);
+        });
+  
+      if (upcomingFlights.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: "No upcoming flights found",
+                flight: flightIdent,
+              }),
+            },
+          ],
+        };
+      }
+  
+      const flight = upcomingFlights[0];
       
       // Get timezones for origin and destination
       const originCode = flight.origin?.code_iata || flight.origin?.code;
