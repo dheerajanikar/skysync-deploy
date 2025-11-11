@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkySync - Flight Assistant Registration</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">✈️ SkySync</div>
+            <p class="tagline">Your AI-powered flight information assistant</p>
+        </div>
+
+        <div class="card">
+            <h1>Get Started</h1>
+            <p class="subtitle">Register to personalize your SkySync experience</p>
+
+            <form id="registrationForm">
+                <div class="form-group">
+                    <label for="name">Full Name *</label>
+                    <input type="text" id="name" name="name" required placeholder="John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number *</label>
+                    <div class="phone-input">
+                        <select id="countryCode" name="countryCode">
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+44">🇬🇧 +44</option>
+                            <option value="+91">🇮🇳 +91</option>
+                            <option value="+86">🇨🇳 +86</option>
+                            <option value="+81">🇯🇵 +81</option>
+                        </select>
+                        <input type="tel" id="phone" name="phone" required placeholder="2135551234" pattern="[0-9]{10}">
+                    </div>
+                    <small>Enter 10-digit phone number without spaces or dashes</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address *</label>
+                    <input type="email" id="email" name="email" required placeholder="john@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="homeAirport">Home Airport *</label>
+                    <select id="homeAirport" name="homeAirport" required>
+                        <option value="">Select your home airport</option>
+                        <option value="SFO">San Francisco (SFO)</option>
+                        <option value="LAX">Los Angeles (LAX)</option>
+                        <option value="JFK">New York JFK (JFK)</option>
+                        <option value="ORD">Chicago O'Hare (ORD)</option>
+                        <option value="ATL">Atlanta (ATL)</option>
+                        <option value="DFW">Dallas/Fort Worth (DFW)</option>
+                        <option value="DEN">Denver (DEN)</option>
+                        <option value="SEA">Seattle (SEA)</option>
+                        <option value="MIA">Miami (MIA)</option>
+                        <option value="BOS">Boston (BOS)</option>
+                        <option value="LAS">Las Vegas (LAS)</option>
+                        <option value="PHX">Phoenix (PHX)</option>
+                        <option value="IAH">Houston (IAH)</option>
+                        <option value="MCO">Orlando (MCO)</option>
+                        <option value="EWR">Newark (EWR)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <span id="btnText">Register</span>
+                    <span id="btnLoader" class="loader" style="display: none;"></span>
+                </button>
+            </form>
+
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+        </div>
+
+        <div class="info-card">
+            <h3>📞 How It Works</h3>
+            <ol>
+                <li>Register with your phone number and details</li>
+                <li>Call <strong>+1 (213) 898-6347</strong></li>
+                <li>Ask about flight status, delays, or search flights</li>
+                <li>Get personalized responses with your name and preferences</li>
+            </ol>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🔍</div>
+                <h4>Flight Status</h4>
+                <p>Check real-time status of any flight</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🌍</div>
+                <h4>Route Search</h4>
+                <p>Find flights between any airports</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📧</div>
+                <h4>Email Details</h4>
+                <p>Get flight info sent to your email</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>Built by Dheeraj for Telnyx Interview</p>
+            <p class="tech-stack">Powered by Telnyx Voice AI • FlightAware API • Supabase</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import path from "path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { createClient } from "@supabase/supabase-js";
@@ -9,6 +10,9 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, '../../public')));
 
 // ---- Supabase (single instance) ----
 const supabase = createClient(
@@ -73,6 +77,62 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (got !== expected) return res.status(401).json({ error: "unauthorized" });
   next();
 }
+
+// Registration endpoint
+app.post('/api/register', async (req, res) => {
+  try {
+    const { phone_number, name, email, home_airport } = req.body;
+
+    if (!phone_number || !name || !email || !home_airport) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (!phone_number.startsWith('+')) {
+      return res.status(400).json({ error: 'Phone number must include country code' });
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('phone_number', phone_number)
+      .maybeSingle();
+
+    if (existingUser) {
+      // Update existing user
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ name, email, home_airport })
+        .eq('phone_number', phone_number);
+
+      if (updateError) {
+        return res.status(500).json({ error: 'Failed to update user' });
+      }
+
+      return res.json({ success: true, message: 'User updated successfully' });
+    }
+
+    // Create new user
+    const { data, error: insertError } = await supabase
+      .from('users')
+      .insert([{ phone_number, name, email, home_airport }])
+      .select();
+
+    if (insertError) {
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
+
+    res.json({ success: true, message: 'User registered successfully', user: data[0] });
+  } catch (error: any) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// Serve landing page at root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../public/index.html'));
+});
 
 // ---- Routes ----
 app.get("/health", (_req: Request, res: Response) => {

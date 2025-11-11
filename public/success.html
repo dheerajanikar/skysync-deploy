@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Successful - SkySync</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .success-card {
+            text-align: center;
+        }
+        
+        .checkmark {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: scaleIn 0.5s ease-out;
+        }
+        
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .phone-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+            letter-spacing: 1px;
+        }
+        
+        .instruction {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        
+        .instruction h3 {
+            margin-bottom: 15px;
+            color: #1a1a1a;
+        }
+        
+        .instruction ol {
+            padding-left: 20px;
+            line-height: 1.8;
+        }
+        
+        .instruction li {
+            margin-bottom: 10px;
+            color: #555;
+        }
+        
+        .user-info {
+            background: #f0f4ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .user-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .user-info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .user-info-label {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .user-info-value {
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">✈️ SkySync</div>
+            <p class="tagline">Your AI-powered flight information assistant</p>
+        </div>
+
+        <div class="card success-card">
+            <div class="checkmark">✅</div>
+            <h1>You're All Set!</h1>
+            <p class="subtitle">Your SkySync account is ready to use</p>
+
+            <div class="user-info">
+                <div class="user-info-item">
+                    <span class="user-info-label">Name:</span>
+                    <span class="user-info-value" id="userName">-</span>
+                </div>
+                <div class="user-info-item">
+                    <span class="user-info-label">Phone:</span>
+                    <span class="user-info-value" id="userPhone">-</span>
+                </div>
+                <div class="user-info-item">
+                    <span class="user-info-label">Home Airport:</span>
+                    <span class="user-info-value" id="userAirport">-</span>
+                </div>
+            </div>
+
+            <div class="instruction">
+                <h3>📞 Try it now:</h3>
+                <div class="phone-number">+1 (213) 898-6347</div>
+                <ol>
+                    <li>Call the number above from your registered phone</li>
+                    <li>SkySync will greet you by name</li>
+                    <li>Ask about flight status or search for flights</li>
+                    <li>Request email summaries if needed</li>
+                </ol>
+            </div>
+
+            <h3 style="margin-bottom: 15px;">Example Questions:</h3>
+            <div style="text-align: left; margin: 0 auto; max-width: 400px;">
+                <p style="margin-bottom: 10px; color: #555;">💬 "What's the status of Southwest 1234?"</p>
+                <p style="margin-bottom: 10px; color: #555;">💬 "Show me flights from San Francisco to Los Angeles tomorrow"</p>
+                <p style="margin-bottom: 10px; color: #555;">💬 "Is my flight delayed?"</p>
+            </div>
+
+            <a href="tel:+12138986347" class="cta-button">📞 Call Now</a>
+        </div>
+
+        <footer>
+            <p>Built by Dheeraj for Telnyx Interview</p>
+            <p class="tech-stack">Powered by Telnyx Voice AI • FlightAware API • Supabase</p>
+        </footer>
+    </div>
+
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const name = urlParams.get('name');
+        const phone = urlParams.get('phone');
+        const airport = urlParams.get('airport');
+
+        // Display user info
+        if (name) document.getElementById('userName').textContent = name;
+        if (phone) document.getElementById('userPhone').textContent = phone;
+        if (airport) document.getElementById('userAirport').textContent = airport;
+    </script>
+</body>
+</html>
