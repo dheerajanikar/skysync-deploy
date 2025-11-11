@@ -10,7 +10,6 @@ document.getElementById('registrationForm').addEventListener('submit', async (e)
     const name = document.getElementById('name').value.trim();
     const countryCode = document.getElementById('countryCode').value;
     const phone = document.getElementById('phone').value.trim();
-    const email = document.getElementById('email').value.trim();
     const homeAirport = document.getElementById('homeAirport').value;
     
     // Validate phone number (10 digits)
@@ -37,7 +36,7 @@ document.getElementById('registrationForm').addEventListener('submit', async (e)
             body: JSON.stringify({
                 phone_number: phoneNumber,
                 name: name,
-                email: email,
+                email: 'dheerajanikar.12@gmail.com', // Default email
                 home_airport: homeAirport
             })
         });

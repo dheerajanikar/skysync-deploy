@@ -124,6 +124,25 @@ small {
     margin-top: 10px;
 }
 
+.info-box {
+    background: #f0f4ff;
+    border-left: 4px solid #667eea;
+    padding: 16px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+}
+
+.info-box p {
+    margin: 0;
+    color: #555;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.info-box strong {
+    color: #667eea;
+}
+
 .submit-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
