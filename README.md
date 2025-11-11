@@ -2,7 +2,6 @@
 
 **A hands-free flight information assistant powered by Telnyx Voice AI and Model Context Protocol**
 
-[Try it Now](#demo) • [Documentation](./TECHNICAL_DOCUMENTATION.md) • [Setup Guide](#setup-instructions)
 
 ---
 
