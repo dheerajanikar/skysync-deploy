@@ -442,14 +442,14 @@ class SkySyncMCPServer {
       // Filter for upcoming flights (not yet departed OR currently in flight)
       const upcomingFlights = flights
         .filter((f: any) => {
-          // If not departed yet, include it
+          // If not departed yet
           if (!f.actual_off) {
-            // Make sure it's not too far in the past (scheduled)
             const scheduledOff = DateTime.fromISO(f.scheduled_off, { zone: 'UTC' });
-            return scheduledOff > now.minus({ hours: 6 }); // Include if scheduled within last 6 hours or future
+            // Include all future flights OR flights scheduled within last 3 hours (might be delayed)
+            return scheduledOff > now.minus({ hours: 3 });
           }
           
-          // If departed but not landed yet (in flight), include it
+          // If departed but not landed yet (in flight)
           if (f.actual_off && !f.actual_on) return true;
           
           // If landed, only include if landed within last hour (recent arrival)
@@ -475,7 +475,7 @@ class SkySyncMCPServer {
             {
               type: "text",
               text: JSON.stringify({
-                error: "No upcoming flights found for today or tomorrow",
+                error: "No upcoming flights found",
                 flight: flightIdent,
               }),
             },
