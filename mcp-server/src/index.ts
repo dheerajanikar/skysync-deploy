@@ -291,6 +291,10 @@ class SkySyncMCPServer {
       );
   
       const flights = response.data.flights || [];
+
+      console.log('=== ALL FLIGHTS RETURNED ===');
+      console.log(JSON.stringify(flights, null, 2));
+      console.log('=== TOTAL COUNT:', flights.length);
       if (flights.length === 0) {
         return {
           content: [
